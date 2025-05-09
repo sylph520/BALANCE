@@ -58,7 +58,7 @@ class PPO2(ActorCriticRLModel):
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None,acc=None,lens=None):
-
+        # add a lens=None inflow
         self.learning_rate = learning_rate
         self.cliprange = cliprange
         self.cliprange_vf = cliprange_vf
@@ -93,6 +93,7 @@ class PPO2(ActorCriticRLModel):
         self.value = None
         self.n_batch = None
         self.summary = None
+        # new start
         self.actor = acc
         self.lens = lens
         self.action_dim = None
@@ -104,21 +105,20 @@ class PPO2(ActorCriticRLModel):
         self.pla_sa = [[0]*n_of_1G]*16
         for i in range(16):
             self.pla_sap.append(np.array([0]*n_of_1G))
+        # new start
         tf.set_random_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
         # prng was removed in latest gym version
         if hasattr(gym.spaces, 'prng'):
             gym.spaces.prng.seed(seed)
-
+        #########################
         super().__init__(policy=policy, env=env, verbose=verbose, requires_vec_env=True,
                          _init_setup_model=_init_setup_model, policy_kwargs=policy_kwargs,
                          seed=seed, n_cpu_tf_sess=n_cpu_tf_sess)
 
         if _init_setup_model:
             self.setup_model()
-        
-        
 
     def _make_runner(self):
         return Runner(env=self.env, model=self, n_steps=self.n_steps,
@@ -143,6 +143,7 @@ class PPO2(ActorCriticRLModel):
                 self.set_random_seed(self.seed)
                 self.sess = tf_util.make_session(num_cpu=self.n_cpu_tf_sess, graph=self.graph)
                
+                # new start
                 if self.action_dim==None:
                     ad = self.env.envs[0].observation_space.shape[0]
                 else:
@@ -155,6 +156,7 @@ class PPO2(ActorCriticRLModel):
                 else:
                     asi = self.lens
                 self.OT = CAPS(asi,ad,self.graph,self.sess)
+                # new end
                 
                 n_batch_step = None
                 n_batch_train = None
@@ -165,7 +167,7 @@ class PPO2(ActorCriticRLModel):
                     n_batch_train = self.n_batch // self.nminibatches
 
                 act_model = self.policy(self.sess, self.observation_space, self.action_space, self.n_envs, 1,
-                                        n_batch_step,loading = loading, reuse=False, **self.policy_kwargs)
+                                        n_batch_step, loading = loading,reuse=False, **self.policy_kwargs)
                 with tf.variable_scope("train_model", reuse=True,
                                        custom_getter=tf_util.outer_scope_getter("train_model")):
                     train_model = self.policy(self.sess, self.observation_space, self.action_space,
@@ -180,10 +182,13 @@ class PPO2(ActorCriticRLModel):
                     self.old_vpred_ph = tf.placeholder(tf.float32, [None], name="old_vpred_ph")
                     self.learning_rate_ph = tf.placeholder(tf.float32, [], name="learning_rate_ph")
                     self.clip_range_ph = tf.placeholder(tf.float32, [], name="clip_range_ph")
+                    # new start
                     self.s_a_prob = tf.placeholder_with_default(tf.convert_to_tensor(np.zeros([1,1]),dtype=tf.float32), shape=[None,None], name='s_a_prob') ###
                     self.source_workload_mask = tf.placeholder(dtype=tf.float32, shape=[None,None], name='source_workload_mask')
+                    # new end
                     self.neglogpac = train_model.proba_distribution.neglogp(self.action_ph)
                     self.entropy = tf.reduce_mean(train_model.proba_distribution.entropy())
+
                     self.vpred = train_model.value_flat
 
                     # Value function clipping: not present in the original PPO
@@ -223,7 +228,7 @@ class PPO2(ActorCriticRLModel):
                     self.approxkl = .5 * tf.reduce_mean(tf.square(self.neglogpac - self.old_neglog_pac_ph))
                     self.clipfrac = tf.reduce_mean(tf.cast(tf.greater(tf.abs(self.ratio - 1.0),
                                                                       self.clip_range_ph), tf.float32))
-                    ##########################
+                    # new start: change loss computation
                     asl = train_model.proba_distribution.logits
                     one_hot_actions = tf.one_hot(self.action_ph, asl.get_shape().as_list()[-1])
                     one_hot_actions = tf.stop_gradient(one_hot_actions)
@@ -273,6 +278,7 @@ class PPO2(ActorCriticRLModel):
                     loss = self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef + self.myklloss * 0.05
 
                     loss_fast = self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef
+                    # new end
 
                     tf.summary.scalar('entropy_loss', self.entropy)
                     tf.summary.scalar('policy_gradient_loss', self.pg_loss)
@@ -280,7 +286,7 @@ class PPO2(ActorCriticRLModel):
                     tf.summary.scalar('approximate_kullback-leibler', self.approxkl)
                     tf.summary.scalar('clip_factor', self.clipfrac)
                     tf.summary.scalar('loss', loss)
-                    tf.summary.scalar('PTF_loss', self.myklloss)
+                    tf.summary.scalar('PTF_loss', self.myklloss)  # new
 
                     with tf.variable_scope('model'):
                         self.params = tf.trainable_variables()
@@ -288,17 +294,20 @@ class PPO2(ActorCriticRLModel):
                             for var in self.params:
                                 tf.summary.histogram(var.name, var)
                     grads = tf.gradients(loss, self.params)
+                    # NEW start
                     # if self.max_grad_norm is not None:
                     #     grads, _grad_norm = tf.clip_by_global_norm(grads, self.max_grad_norm)
                     grads = list(zip(grads, self.params))
 
                     grads_fast = tf.gradients(loss_fast, self.params)
                     grads_fast = list(zip(grads_fast, self.params))
+                    # NEW end
                 trainer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_ph, epsilon=1e-5)
                 self._train = trainer.apply_gradients(grads)
 
-                self._train_fast = trainer.apply_gradients(grads_fast)
+                self._train_fast = trainer.apply_gradients(grads_fast)  # new
 
+                # new: a new loss entropyTeach
                 self.loss_names = ['policy_loss', 'value_loss', 'policy_entropy', 'approxkl', 'clipfrac','entropyTeach']
 
                 with tf.variable_scope("input_info", reuse=False):
@@ -333,7 +342,7 @@ class PPO2(ActorCriticRLModel):
                 tf.global_variables_initializer().run(session=self.sess)  # pylint: disable=E1101
 
                 self.summary = tf.summary.merge_all()
-                #############################
+                #######################
                 asl = self.train_model.proba_distribution.logits
                 self.my_nosoftmax = asl
 
@@ -379,7 +388,8 @@ class PPO2(ActorCriticRLModel):
                 approximation of kl divergence, updated clipping range, training update operation
         :param cliprange_vf: (float) Clipping factor for the value function
         """
-        
+        # add a new ops arg
+        # new start: ast, softmax to ptf
         # self.asl = self.actor[0].act_prob( learning_rate, cliprange, obs, returns, masks, actions, values, neglogpacs, action_masks, update,
         #             writer, states, cliprange_vf)
         # #############
@@ -504,12 +514,16 @@ class PPO2(ActorCriticRLModel):
     def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="PPO2",
               reset_num_timesteps=True,ids=None):
         # Transform to callable if needed
-        tf.reset_default_graph()
+        tf.reset_default_graph()  # new
+
         self.learning_rate = get_schedule_fn(self.learning_rate)
         self.cliprange = get_schedule_fn(self.cliprange)
         cliprange_vf = get_schedule_fn(self.cliprange_vf)
+        
+        # new start
         time_test_sum = datetime.timedelta(0)
         sum_count_test = 0
+        # new end
 
         new_tb_log = self._init_num_timesteps(reset_num_timesteps)
         callback = self._init_callback(callback)
@@ -535,12 +549,20 @@ class PPO2(ActorCriticRLModel):
                 lr_now = self.learning_rate(frac)
                 cliprange_now = self.cliprange(frac)
                 cliprange_vf_now = cliprange_vf(frac)
+
+                # new start
                 self.nowU = update
                 callback.on_rollout_start()
+                # new end
+
                 # true_reward is the reward without discount
                 rollout = self.runner.run(callback)
+
+                # new start
                 self.nowU = update
                 t_fin_run = time.time()
+                # new end
+
                 # Unpack
                 obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward, action_masks ,ops , time_test , count_test= rollout
                 time_test_sum = time_test_sum + time_test
@@ -568,7 +590,7 @@ class PPO2(ActorCriticRLModel):
                             slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs, action_masks,ops))                            
                             mb_loss_vals.append(self._train_step(lr_now, cliprange_now, *slices, writer=writer,
                                                                  update=timestep, cliprange_vf=cliprange_vf_now))
-                            t_fin_train = time.time()
+                            t_fin_train = time.time() # new
                 else:  # recurrent version
                     update_fac = self.n_batch // self.nminibatches // self.noptepochs // self.n_steps + 1
                     assert self.n_envs % self.nminibatches == 0
@@ -613,10 +635,14 @@ class PPO2(ActorCriticRLModel):
                     logger.logkv('time_elapsed', t_start - t_first_start)
                     for (loss_val, loss_name) in zip(loss_vals, self.loss_names):
                         logger.logkv(loss_name, loss_val)
+
+                    # new start
                     t_run = -t_start+t_fin_run
                     t_tra =- t_fin_run+ t_fin_train
                     logger.logkv('time_run', t_run)
                     logger.logkv('time_train', t_tra)
+                    # new start
+
                     logger.dumpkvs()
 
             callback.on_training_end()
@@ -649,8 +675,8 @@ class PPO2(ActorCriticRLModel):
             "seed": self.seed,
             "_vectorize_action": self._vectorize_action,
             "policy_kwargs": self.policy_kwargs,
-            "act_len": len(self.actor),
-            "pact_len": self.env.envs[0].observation_space.shape[0]
+            "act_len": len(self.actor),  # new
+            "pact_len": self.env.envs[0].observation_space.shape[0]  # new
         }
 
         params_to_save = self.get_parameters()
@@ -699,8 +725,10 @@ class Runner(AbstractEnvRunner):
         sum_time_test = datetime.timedelta(0)
         sum_count_test = 0
 
+        # new start
         option = self.model.OT.choose_o(self.obs)
         termination = self.model.OT.get_t(self.obs, option)
+        # new end
 
         for koko in range(self.n_steps):
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones, action_mask=self.action_masks)
@@ -724,12 +752,14 @@ class Runner(AbstractEnvRunner):
             startflag = False
             self.obs[:], rewards, self.dones, infos = self.env.step(clipped_actions,start=startflag)
 
+            # new start
             self.model.OT.store_transition( mb_obs[-1], actions, rewards, self.dones,self.obs, opa)
             if(self.model.nowU>1 and (koko %self.n_steps /4)==0):
                 self.model.OT.update(mb_obs[-1], option, self.dones,  self.obs)
             termination = self.model.OT.get_t(self.obs, option)
             if np.random.uniform() < termination:
                 option = self.model.OT.choose_o(self.obs)
+            # new end
 
 
             self.model.num_timesteps += self.n_envs
@@ -743,19 +773,17 @@ class Runner(AbstractEnvRunner):
                     return [None] * 10
                 end_time_test = datetime.datetime.now()
                 tem = end_time_test - start_time_test
-                if(  (tem)>datetime.timedelta(seconds=2)  ):
+                if(  (tem)>datetime.timedelta(seconds=2)  ): 
                     sum_time_test = sum_time_test + tem
                     sum_count_test = sum_count_test +1
                     print("new sum_time_test:")
                     print(sum_time_test)
-
 
             self.action_masks.clear()
             for info in infos:
                 maybe_ep_info = info.get('episode')
                 if maybe_ep_info is not None:
                     ep_infos.append(maybe_ep_info)
-                
             self.action_masks.append(flatten_action_mask(self.env.action_space, self.env.get_attr("valid_actions")))
             assert len(self.action_masks) == 1
             self.action_masks = self.action_masks[-1]
@@ -764,7 +792,7 @@ class Runner(AbstractEnvRunner):
         mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32)
         mb_actions = np.asarray(mb_actions)
-        mb_opt = np.asarray(mb_opt)
+        mb_opt = np.asarray(mb_opt)  # new
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
         mb_dones = np.asarray(mb_dones, dtype=np.bool)
@@ -785,6 +813,7 @@ class Runner(AbstractEnvRunner):
             mb_advs[step] = last_gae_lam = delta + self.gamma * self.lam * nextnonterminal * last_gae_lam
         mb_returns = mb_advs + mb_values
 
+        # NEW: opt
         mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward, mb_action_masks ,mb_opt= \
             map(swap_and_flatten, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward, mb_action_masks,mb_opt))
 
@@ -802,6 +831,7 @@ def swap_and_flatten(arr):
     shape = arr.shape
     return arr.swapaxes(0, 1).reshape(shape[0] * shape[1], *shape[2:])
 
+# new
 import tensorflow as tf
 
 

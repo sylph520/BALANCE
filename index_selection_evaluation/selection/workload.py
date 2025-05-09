@@ -1,8 +1,9 @@
+from typing import List
 from .index import Index
 
 
 class Workload:
-    def __init__(self, queries, description="",idxx=None):
+    def __init__(self, queries: List['Query'], description="",idxx=None):
         self.queries = queries
         self.budget = None
         self.description = description

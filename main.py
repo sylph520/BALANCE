@@ -153,9 +153,8 @@ if __name__ == "__main__":
         )
         callbacks.append(multi_validation_callback)
 
+    # setup learning timestamp to self.training_start_time
     experiment.start_learning()
-
-
 
     model.learn(
         total_timesteps=experiment.config["timesteps"],

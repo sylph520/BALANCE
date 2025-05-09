@@ -1,6 +1,7 @@
 import copy
 import logging
 import random
+from typing import List
 
 import numpy as np
 
@@ -61,7 +62,7 @@ class WorkloadGenerator(object):
         self.wl_validation = []
         self.wl_testing = []
 
-        if config["similar_workloads"] and config["unknown_queries"] == 0:
+        if config["similar_workloads"] and config["unknown_queries"] == 0:  # similar workloads with all known queries
             # Todo: this branch can probably be removed
             assert self.varying_frequencies, "Similar workloads can only be created with varying frequencies."
             self.wl_validation = [None]
@@ -76,7 +77,7 @@ class WorkloadGenerator(object):
                     config["training_instances"], config["size"], config["query_class_change_frequency"]
                 )
         elif config["unknown_queries"] > 0 and config["validation_testing"]["unknown_query_probabilities"][-1] > 0.01:
-
+            # with unknown queries
             embedder_connector = PostgresDatabaseConnector(self.database_name, autocommit=True)
             embedder = WorkloadEmbedder(
                 # Transform globally_indexable_columns to list of lists.
@@ -127,6 +128,7 @@ class WorkloadGenerator(object):
             original_available_query_classes = self.available_query_classes
             self.available_query_classes = self.known_query_classes
 
+            # generate self.wl_training, similar & cf OR similar OR train+validation+test
             if config["similar_workloads"]:
                 if config["query_class_change_frequency"] is not None:
                     logging.critical(
@@ -289,7 +291,14 @@ class WorkloadGenerator(object):
         return processed_queries
 
     def _store_indexable_columns(self, query):
+        """
+        referenced columns for non-JOB benchmark;
+        for JOB, only accounts for the columns after keyword WHERE
+        """
         if self.benchmark != "JOB":
+            # TODO: select filtered db columns where their names in the query text,
+            # there're issues with this rule, but it's fine with 22 query class in tpc-h
+            # e.g., part and partsupp always co-occurs.
             for column in self.workload_columns:
                 if column.name in query.text:
                     query.columns.append(column)
@@ -306,7 +315,7 @@ class WorkloadGenerator(object):
                 if column.name in query_text_after_where and f"{column.table.name} " in query_text_before_where:
                     query.columns.append(column)
 
-    def _workloads_from_tuples(self, tuples, unknown_query_probability=None):
+    def _workloads_from_tuples(self, tuples, unknown_query_probability=None) -> List[Workload]:
         workloads = []
         unknown_query_probability = "" if unknown_query_probability is None else unknown_query_probability
 
@@ -397,6 +406,8 @@ class WorkloadGenerator(object):
     # For the following workload, we remove one random element, add another random one with frequency, and
     # randomly change the frequency of one element (including the new one).
     def _generate_similar_workloads(self, instances, size):
+        # remove & insert a query instance that is drawn from random query classes
+        # for a *size* of times
         assert size <= len(
             self.available_query_classes
         ), "Cannot generate workload with more queries than query classes"
@@ -430,6 +441,7 @@ class WorkloadGenerator(object):
 
     # This version uses the same query id selction for query_class_change_frequency workloads
     def _generate_similar_workloads_qccf(self, instances, size, query_class_change_frequency):
+        # random sample a *size* of query class along with a random freq
         assert size <= len(
             self.available_query_classes
         ), "Cannot generate workload with more queries than query classes"
@@ -519,6 +531,7 @@ class WorkloadGenerator(object):
         workload = self._workloads_from_tuples([(available_query_classes, query_class_frequencies)])[0]
 
         indexable_columns = workload.indexable_columns()
+        # only_utilized_indexes = True  # debug line, for DB2Advis like optimizer chosen indexes
         if only_utilized_indexes:
             indexable_columns = self._only_utilized_indexes(indexable_columns)
         selected_columns = []

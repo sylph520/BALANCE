@@ -22,7 +22,7 @@ from .schema import Schema
 from .workload_generator import WorkloadGenerator
 
 class Experiment(object):
-    def __init__(self, configuration_file,aa=None,id=None):
+    def __init__(self, configuration_file, aa=None, id=None):
         self._init_times()
 
         cp = ConfigurationParser(configuration_file)
@@ -62,11 +62,16 @@ class Experiment(object):
         
 
     def prepare(self):
+        """
+        setup self.schema, self.workload_generator (for trianing, validation and testing),
+        experient budgets (randomly selected from fixed lists),
+        and self.embedder
+        """
         self.schema = Schema(
             self.config["workload"]["benchmark"],
             self.config["workload"]["scale_factor"],self.config["database"],
             self.config["column_filters"]
-        )
+        )  # setup schema and reduce columns with small rows
 
         self.workload_generator = WorkloadGenerator(
             self.config["workload"],spath =  self.config["workload"]["path"],
@@ -115,6 +120,9 @@ class Experiment(object):
        
 
     def _assign_budgets_to_workloads(self):
+        """
+        randomly assign budget from chosen budget list
+        """
         for workload_list in self.workload_generator.wl_testing:
             for workload in workload_list:
                 workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])  
@@ -126,6 +134,9 @@ class Experiment(object):
 
 
     def _pickle_workloads(self):
+        """
+        pickle testing, validation and training workloads
+        """
         st = "1"
         with open(f"{self.experiment_folder_path}/testing_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_testing, handle, protocol=pickle.HIGHEST_PROTOCOL)
