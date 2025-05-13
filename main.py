@@ -7,6 +7,7 @@ import gym_db  # noqa: F401
 from gym_db.common import EnvironmentType
 from balance.experiment import Experiment
 import os
+import argparse
 
 
 use_gpu = "0"
@@ -15,19 +16,21 @@ os.environ["CUDA_VISIBLE_DEVICES"] = use_gpu
 if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO)
-    
-    CONFIGURATION_FILE = "experiments/tpch.json"
-    
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--wk_type', type=str, default='tpch')
+    args = parser.parse_args()
+
+    CONFIGURATION_FILE = f"experiments/{(args.wk_type).lower()}.json"
+    # CONFIGURATION_FILE = "experiments/tpcds.json"
 
     logging.warning("use gpu:" + use_gpu)
     experiment = Experiment(CONFIGURATION_FILE)
 
-
-
     if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
         from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
         from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
-        from stable_baselines.ppo2 import ppo2,ppo2_BALANCE
+        from stable_baselines.ppo2 import ppo2, ppo2_BALANCE
         algorithm_class = ppo2_BALANCE.PPO2
         source_algorithm_class = ppo2_BALANCE.PPO2
     elif experiment.config["rl_algorithm"]["stable_baselines_version"] == 3:
@@ -40,7 +43,6 @@ if __name__ == "__main__":
     else:
         raise ValueError
 
-    
     experiment.prepare()
     with open(f"{experiment.experiment_folder_path}/experiment_object.pickle", "wb") as handle:
         pickle.dump(experiment, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -56,37 +58,29 @@ if __name__ == "__main__":
     experiment.source_model_type = source_algorithm_class
     experiment.model_type = algorithm_class
 
-
-
     path1 = "./experiment_results/source"
     path2 = "./experiment_results/source"
     path3 = "./experiment_results/source"
 
-
-
-    experiment.Smodel_1 = experiment.source_model_type.load(path1+"/f_s1.zip")
+    experiment.Smodel_1 = experiment.source_model_type.load(path1 + "/f_s1.zip")
     experiment.Smodel_1.training = False
-    experiment.Smodel_2 = experiment.source_model_type.load(path2+"/f_s2.zip")
+    experiment.Smodel_2 = experiment.source_model_type.load(path2 + "/f_s2.zip")
     experiment.Smodel_2.training = False
-    experiment.Smodel_3 = experiment.source_model_type.load(path3+"/f_s3.zip")
+    experiment.Smodel_3 = experiment.source_model_type.load(path3 + "/f_s3.zip")
     experiment.Smodel_3.training = False
-  
-    
+
     temac.append(experiment.Smodel_1)
     temac.append(experiment.Smodel_2)
     temac.append(experiment.Smodel_3)
-    
-    
-   
-    model = algorithm_class(
-        
+
+    model: ppo2 = algorithm_class(
         policy=experiment.config["rl_algorithm"]["policy"],
         env=training_env,
         verbose=2,
         seed=experiment.config["random_seed"],
         gamma=experiment.config["rl_algorithm"]["gamma"],
         tensorboard_log="tensor_log",
-        acc = temac,
+        acc=temac,
         policy_kwargs=copy.copy(
             experiment.config["rl_algorithm"]["model_architecture"]
         ),  # This is necessary because SB modifies the passed dict.
@@ -95,7 +89,6 @@ if __name__ == "__main__":
     logging.warning(f"Creating model with NN architecture: {experiment.config['rl_algorithm']['model_architecture']}")
 
     experiment.set_model(model)
-    
 
     callback_test_env = VecNormalize(
         DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)]),
@@ -159,7 +152,7 @@ if __name__ == "__main__":
     model.learn(
         total_timesteps=experiment.config["timesteps"],
         callback=callbacks,
-        tb_log_name=experiment.id,ids=experiment.config["id"]
+        tb_log_name=experiment.id, ids=experiment.config["id"]
     )
     experiment.finish_learning(
         training_env,
@@ -167,10 +160,8 @@ if __name__ == "__main__":
         validation_callback.best_model_step * experiment.config["parallel_environments"],
     )
 
-    
-    
     with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
-        pickle.dump([training_env.venv.envs[0].dic,callbacks[0].eval_env.venv.envs[0].dic,callbacks[1].eval_env.venv.envs[0].dic], handle, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump([training_env.venv.envs[0].dic, callbacks[0].eval_env.venv.envs[0].dic, callbacks[1].eval_env.venv.envs[0].dic], handle, protocol=pickle.HIGHEST_PROTOCOL)
     experiment.finishmy()
-    
+
     print()

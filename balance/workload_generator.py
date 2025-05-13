@@ -316,6 +316,9 @@ class WorkloadGenerator(object):
                     query.columns.append(column)
 
     def _workloads_from_tuples(self, tuples, unknown_query_probability=None) -> List[Workload]:
+        """
+        generate workloads according to selected templates in *tuples*
+        """
         workloads = []
         unknown_query_probability = "" if unknown_query_probability is None else unknown_query_probability
 
@@ -353,6 +356,7 @@ class WorkloadGenerator(object):
         
 
         unique_workload_tuples = set()
+        # sample *required_unique_workloads* number of workloads
         while required_unique_workloads > len(unique_workload_tuples):
             workload_tuple = self._generate_random_workload(size, unknown_query_probability)
             unique_workload_tuples.add(workload_tuple)

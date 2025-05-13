@@ -520,6 +520,7 @@ class Experiment(object):
 
     # todo: code duplication with validate_model
     def test_model(self, model):
+        """run tests over testing workloads"""
         model_performances = []
         for test_wl in self.workload_generator.wl_testing:
             test_env = self.DummyVecEnv([self.make_env(0, EnvironmentType.TESTING, test_wl)])
@@ -536,6 +537,7 @@ class Experiment(object):
         return model_performances, "test"
 
     def validate_model(self, model):
+        """run tests over testing workloads"""
         model_performances = []
         for validation_wl in self.workload_generator.wl_validation:
             validation_env = self.DummyVecEnv([self.make_env(0, EnvironmentType.VALIDATION, validation_wl)])
@@ -580,6 +582,10 @@ class Experiment(object):
             action_manager_class = getattr(
                 importlib.import_module("balance.action_manager"), self.config["action_manager"]
             )
+            """
+            set up action_manager, observation_manager, reward_calculator, and workloads.
+            Then generate an env instance and return.
+            """
             action_manager = action_manager_class(
                 indexable_column_combinations=self.globally_indexable_columns,
                 action_storage_consumptions=self.action_storage_consumptions,
@@ -611,6 +617,7 @@ class Experiment(object):
             )
             reward_calculator = reward_calculator_class()
 
+            # setup workloads according to *environment_type*
             if environment_type == EnvironmentType.TRAINING:
                 workloads = self.workload_generator.wl_training if workloads_in is None else workloads_in
             elif environment_type == EnvironmentType.TESTING:
@@ -620,6 +627,7 @@ class Experiment(object):
             else:
                 raise ValueError
 
+            # input the total 10000 workloads into the RL env
             env = gym.make(
                 f"DB-v{self.config['gym_version']}",
                 environment_type=environment_type,
