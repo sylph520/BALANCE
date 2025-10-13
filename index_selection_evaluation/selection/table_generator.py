@@ -136,7 +136,7 @@ class TableGenerator:
         return os.listdir(self.directory)
 
     def _prepare(self):
-        if self.benchmark_name == "tpch":
+        if self.benchmark_name in ["tpch", "tpchc"]:
             self.make_command = ["make", "DATABASE=POSTGRESQL"]
             if platform.system() == "Darwin":
                 self.make_command.append("MACHINE=MACOS")

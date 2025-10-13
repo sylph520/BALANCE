@@ -23,6 +23,9 @@ from .workload_generator import WorkloadGenerator
 
 class Experiment(object):
     def __init__(self, configuration_file, aa=None, id=None):
+        """
+        setup the experiment from configuration, random seed, and related method info
+        """
         self._init_times()
 
         cp = ConfigurationParser(configuration_file)
@@ -59,12 +62,12 @@ class Experiment(object):
 
         self.EXPERIMENT_RESULT_PATH = self.config["result_path"]
         self._create_experiment_folder()
-        
+
 
     def prepare(self):
         """
-        setup self.schema, self.workload_generator (for trianing, validation and testing),
-        experient budgets (randomly selected from fixed lists),
+        setup self.schema, self.workload_generator (for training, validation and testing),
+        experiment budgets (randomly selected from fixed lists),
         and self.embedder
         """
         self.schema = Schema(
@@ -116,9 +119,6 @@ class Experiment(object):
             for workloads in self.workload_generator.wl_validation:
                 self.multi_validation_wl.extend(self.rnd.sample(workloads, min(7, len(workloads))))
 
-
-       
-
     def _assign_budgets_to_workloads(self):
         """
         randomly assign budget from chosen budget list
@@ -129,9 +129,7 @@ class Experiment(object):
 
         for workload_list in self.workload_generator.wl_validation:
             for workload in workload_list:
-                workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])  
-
-
+                workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])
 
     def _pickle_workloads(self):
         """
@@ -517,6 +515,109 @@ class Experiment(object):
             # fmt: on
             f.write("\n\n")
 
+    def compare(self):
+        """
+        run the comparative algorithms, e.g., extend, db2advis
+        """
+        if len(self.config["comparison_algorithms"]) < 1:
+            return
+
+        if "extend" in self.config["comparison_algorithms"]:
+            self._compare_extend()
+        if "db2advis" in self.config["comparison_algorithms"]:
+            self._compare_db2advis()
+        if "swirl" in self.config["comparison_algorithms"]:
+            self._compare_swirl()
+        for key, comparison_performance in self.comparison_performances.items():
+            print(f"Comparison for {key}:")
+            for key, value in comparison_performance.items():
+                print(f"    {key}: {np.mean(value):.2f} ({value})")
+
+        self._evaluate_comparison()
+
+    def _evaluate_comparison(self):
+        for key, comparison_indexes in self.comparison_indexes.items():
+            columns_from_indexes = set()
+            for index in comparison_indexes:
+                for column in index.columns:
+                    columns_from_indexes |= set([column])
+
+            impossible_index_columns = columns_from_indexes - self.single_column_flat_set
+            logging.critical(f"{key} finds indexes on these not indexable columns:\n    {impossible_index_columns}")
+
+            assert len(impossible_index_columns) == 0, "Found indexes on not indexable columns."
+
+    def _compare_extend(self):
+        self.evaluated_workloads = set()
+        for model_performances_outer, run_type in [self.test_model(self.model), self.validate_model(self.model)]:
+            for model_performances, _, _ in model_performances_outer:
+                self.comparison_performances[run_type]["Extend"].append([])
+                for model_performance in model_performances:
+                    assert (
+                        model_performance["evaluated_workload"].budget == model_performance["available_budget"]
+                    ), "Budget mismatch!"
+                    assert model_performance["evaluated_workload"] not in self.evaluated_workloads
+                    self.evaluated_workloads.add(model_performance["evaluated_workload"])
+
+                    parameters = {
+                        "budget_MB": model_performance["evaluated_workload"].budget,
+                        "max_index_width": self.config["max_index_width"],
+                        "min_cost_improvement": 1.003,
+                    }
+                    extend_connector = PostgresDatabaseConnector(self.schema.database_name, autocommit=True)
+                    extend_connector.drop_indexes()
+                    extend_algorithm = ExtendAlgorithm(extend_connector, parameters)
+                    indexes = extend_algorithm.calculate_best_indexes(model_performance["evaluated_workload"])
+                    self.comparison_indexes["Extend"] |= frozenset(indexes)
+
+                    self.comparison_performances[run_type]["Extend"][-1].append(extend_algorithm.final_cost_proportion)
+
+    def _compare_db2advis(self):
+        for model_performances_outer, run_type in [self.test_model(self.model), self.validate_model(self.model)]:
+            for model_performances, _, _ in model_performances_outer:
+                self.comparison_performances[run_type]["DB2Adv"].append([])
+                for model_performance in model_performances:
+                    parameters = {
+                        "budget_MB": model_performance["available_budget"],
+                        "max_index_width": self.config["max_index_width"],
+                        "try_variations_seconds": 0,
+                    }
+                    db2advis_connector = PostgresDatabaseConnector(self.schema.database_name, autocommit=True)
+                    db2advis_connector.drop_indexes()
+                    db2advis_algorithm = DB2AdvisAlgorithm(db2advis_connector, parameters)
+                    indexes = db2advis_algorithm.calculate_best_indexes(model_performance["evaluated_workload"])
+                    self.comparison_indexes["DB2Adv"] |= frozenset(indexes)
+
+                    self.comparison_performances[run_type]["DB2Adv"][-1].append(
+                        db2advis_algorithm.final_cost_proportion
+                    )
+
+                    self.evaluated_workloads_strs.append(f"{model_performance['evaluated_workload']}\n")
+
+    def _compare_swirl(self):
+        self.evaluated_workloads = set()
+        for model_performances_outer, run_type in [self.test_model(self.model), self.validate_model(self.model)]:
+            for model_performances, _, _ in model_performances_outer:
+                self.comparison_performances[run_type]["Extend"].append([])
+                for model_performance in model_performances:
+                    assert (
+                        model_performance["evaluated_workload"].budget == model_performance["available_budget"]
+                    ), "Budget mismatch!"
+                    assert model_performance["evaluated_workload"] not in self.evaluated_workloads
+                    self.evaluated_workloads.add(model_performance["evaluated_workload"])
+
+                    parameters = {
+                        "budget_MB": model_performance["evaluated_workload"].budget,
+                        "max_index_width": self.config["max_index_width"],
+                        "min_cost_improvement": 1.003,
+                    }
+                    extend_connector = PostgresDatabaseConnector(self.schema.database_name, autocommit=True)
+                    extend_connector.drop_indexes()
+                    extend_algorithm = ExtendAlgorithm(extend_connector, parameters)
+                    indexes = extend_algorithm.calculate_best_indexes(model_performance["evaluated_workload"])
+                    self.comparison_indexes["Extend"] |= frozenset(indexes)
+
+                    self.comparison_performances[run_type]["Extend"][-1].append(extend_algorithm.final_cost_proportion)
 
     # todo: code duplication with validate_model
     def test_model(self, model):
@@ -683,5 +784,4 @@ class Experiment(object):
         else:
             raise ValueError("There are only versions 2 and 3 of StableBaselines.")
 
-    
 

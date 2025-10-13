@@ -1,3 +1,4 @@
+import os
 import copy
 import logging
 import random
@@ -28,6 +29,7 @@ class WorkloadGenerator(object):
             "TPCH",
             "TPCDS",
             "JOB",
+            "TPCHC"
         ], f"Benchmark '{config['benchmark']}' is currently not supported."
 
         # For create view statement differentiation
@@ -249,6 +251,8 @@ class WorkloadGenerator(object):
     def _set_number_of_query_classes(self):
         if self.benchmark == "TPCH":
             return 22
+        elif self.benchmark == "TPCHC":
+            return 20
         elif self.benchmark == "TPCDS":
             return 99
         elif self.benchmark == "JOB":
@@ -276,6 +280,10 @@ class WorkloadGenerator(object):
         return finished_queries
 
     def _preprocess_queries(self, queries):
+        """
+        remove limit clauses?
+        and create view with exp unique name
+        """
         processed_queries = []
         for query in queries:
             query = query.replace("limit 100", "")
@@ -378,32 +386,34 @@ class WorkloadGenerator(object):
         test_workloads = self._workloads_from_tuples(test_workload_tuples, unknown_query_probability)
         train_workloads = self._workloads_from_tuples(train_workload_tuples, unknown_query_probability)
 
-        import joblib
 
+        if not os.path.exists(self.path2):
+            return train_workloads, test_workloads, validation_workloads
+        else:
+            import joblib
+            pp = self.path2
+            with open(pp, 'rb') as f:
+                wl1 = joblib.load(f)  # same teammples with different frequencies?
+                f.close()
+
+
+            toto = wl1[-200:]
+            toto2 = wl1[-250:-200]
         
-        pp = self.path2
-        with open(pp, 'rb') as f:
-            wl1 = joblib.load(f) #
-            f.close()
+            res1=[]
+            res2=[]
+            res3=[]
 
 
-        toto = wl1[-200:]
-        toto2 = wl1[-250:-200]
-        
-        res1=[]
-        res2=[]
-        res3=[]
+            while len(res1)<train_instances:
+                res1.extend(self.rnd.sample(toto, 50))
 
+            while len(res2)<validation_instances:
+                res2.extend(self.rnd.sample(toto2, 10))
 
-        while len(res1)<train_instances:
-            res1.extend(self.rnd.sample(toto, 50))
-
-        while len(res2)<validation_instances:
-            res2.extend(self.rnd.sample(toto2, 10))
-
-        while len(res3)<test_instances:
-            res3.extend(self.rnd.sample(toto2, 10))
-        return res1,res2,res3
+            while len(res3)<test_instances:
+                res3.extend(self.rnd.sample(toto2, 10))
+            return res1,res2,res3
 
 
     # The core idea is to create workloads that are similar and only change slightly from one to another.

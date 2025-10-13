@@ -3,6 +3,7 @@
   "description": "Just a TPCDS Test Experiment",
   "gym_version": 1,
   "timesteps": 20000,
+  "database": "balance_ds10",
   "random_seed": 62,
   "parallel_environments": 1,
   "pickle_cost_estimation_caches": false,

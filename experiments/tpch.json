@@ -52,7 +52,7 @@
     "excluded_query_classes": [2,17,20],
     "unknown_queries": 0
   },
-  "comparison_algorithms": ["extend"],
+  "comparison_algorithms": ["extend", "db2advis"],
   "budgets": {
     "training": false,
     "validation_and_testing": [500, 1000, 1500, 2500, 3500, 5000, 6500, 8000, 10000]
