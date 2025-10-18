@@ -19,9 +19,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--wk_type', type=str, default='tpch')
+    parser.add_argument('--config', type=str, help='Path to configuration file (overrides wk_type)')
     args = parser.parse_args()
 
-    CONFIGURATION_FILE = f"experiments/{(args.wk_type).lower()}.json"
+    if args.config:
+        CONFIGURATION_FILE = args.config
+    else:
+        CONFIGURATION_FILE = f"experiments/{(args.wk_type).lower()}.json"
     # CONFIGURATION_FILE = "experiments/tpcds.json"
 
     logging.warning("use gpu:" + use_gpu)

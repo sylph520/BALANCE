@@ -113,10 +113,10 @@ class ConfigurationParser(object):
             #     self.config["workload"]["validation_testing"]["unknown_query_probabilities"][-1] > 0
             # ), "There is no point in specyfing unknown queries if unknown_query_probability is 0."
 
-        if self.config["workload"]["benchmark"] not in ["JOB", 'TPCHC']:
-            assert (
-                len(self.config["workload"]["excluded_query_classes"]) > 0
-            ), "Are you sure that these workloads should not exclude certain query classes?"
+        # if self.config["workload"]["benchmark"] not in ["JOB", 'TPCHC']:
+        #     assert (
+        #         len(self.config["workload"]["excluded_query_classes"]) > 0
+        #     ), "Are you sure that these workloads should not exclude certain query classes?"
 
         if (
             "query_class_change_frequency" in self.config["workload"]

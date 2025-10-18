@@ -745,6 +745,8 @@ class Experiment(object):
                     "env_id": env_id,
                     "similar_workloads": self.config["workload"]["similar_workloads"],
                     "ids": self.config["id"],
+                    "constraint_type": self.config.get("constraint_type", "storage"),
+                    "constraint_value": self.config.get("constraint_value", None),
                 },
             )
             return env

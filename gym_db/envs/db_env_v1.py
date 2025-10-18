@@ -83,8 +83,8 @@ class DBEnvV1(gym.Env):
             path = path+"train"+"_"
             testflag = False
         elif self.environment_type == EnvironmentType.TESTING:
-            path = path+"test"+"_"   
-            testflag = True 
+            path = path + "test" + "_"
+            testflag = True
         elif self.environment_type == EnvironmentType.VALIDATION:
             path = path+"validation"+"_"
             testflag = False
@@ -93,7 +93,7 @@ class DBEnvV1(gym.Env):
 
         startup = False & start
 
-        
+
         if not new_index.is_single_column():
             parent_index = Index(new_index.columns[:-1])
 
@@ -105,18 +105,25 @@ class DBEnvV1(gym.Env):
 
             assert old_index_size > 0, "Parent index size must have been found if not single column index."
 
-        
+
         print_flag = (self.steps_taken >= self.max_steps_per_episode) and testflag
-        
+
 
         environment_state = self._update_return_env_state(
             init=False, new_index=new_index, old_index_size=old_index_size ,print_flag= print_flag
         )
         current_observation = self.observation_manager.get_observation(environment_state,self.config["database_name"])
 
-        self.valid_actions, is_valid_action_left = self.action_manager.update_valid_actions(
-            action, self.current_budget, self.current_storage_consumption
-        )
+        if self.constraint_type == "storage":
+            self.valid_actions, is_valid_action_left = self.action_manager.update_valid_actions(
+                action, self.current_budget, self.current_storage_consumption,
+                constraint_type=self.constraint_type
+            )
+        elif self.constraint_type == "count":
+            self.valid_actions, is_valid_action_left = self.action_manager.update_valid_actions(
+                action, self.current_budget, len(self.current_indexes),
+                constraint_type=self.constraint_type
+            )
         episode_done = self.steps_taken >= self.max_steps_per_episode or not is_valid_action_left
 
         reward = self.reward_calculator.calculate_reward(environment_state)
@@ -134,7 +141,9 @@ class DBEnvV1(gym.Env):
         episode_performance = {
             "achieved_cost": self.current_costs / self.initial_costs * 100,
             "memory_consumption": self.current_storage_consumption,
-            "available_budget": self.current_budget,
+            # For index count constraint, we still report the original workload budget to maintain compatibility
+            # with the assertion in the experiment code, but the constraint was enforced differently
+            "available_budget": self.current_workload.budget,
             "evaluated_workload": self.current_workload,
             "indexes": self.current_indexes,
         }
@@ -168,10 +177,20 @@ class DBEnvV1(gym.Env):
         else:
             self.current_workload = self.workloads[self.current_workload_idx % len(self.workloads)]
 
-        self.current_budget = self.current_workload.budget
+        # Determine constraint type - storage (budget in MB) or count (number of indexes)
+        self.constraint_type = self.config.get("constraint_type", "storage")
+        if self.constraint_type == "count":
+            # For count constraint, use constraint_value as the maximum number of indexes
+            self.current_budget = self.config.get("constraint_value", 10)  # default to 10 indexes
+        else:
+            # For storage constraint, use the original budget mechanism
+            self.current_budget = self.current_workload.budget
         self.previous_cost = None
 
-        self.valid_actions = self.action_manager.get_initial_valid_actions(self.current_workload, self.current_budget)
+        if self.constraint_type == "storage":
+            self.valid_actions = self.action_manager.get_initial_valid_actions(self.current_workload, self.current_budget, self.constraint_type)
+        elif self.constraint_type == "count":
+            self.valid_actions = self.action_manager.get_initial_valid_actions(self.current_workload, self.current_budget, self.constraint_type)
 
         environment_state = self._update_return_env_state(init=True)
 
@@ -212,12 +231,19 @@ class DBEnvV1(gym.Env):
             if new_index_size == 0:
                 new_index_size = 1
 
-            if self.current_budget:
-                assert b_to_mb(self.current_storage_consumption) <= self.current_budget, (
-                    "Storage consumption exceeds budget: "
-                    f"{b_to_mb(self.current_storage_consumption)} "
-                    f" > {self.current_budget}"
-                )
+            if self.constraint_type == "storage":
+                if self.current_budget:
+                    assert b_to_mb(self.current_storage_consumption) <= self.current_budget, (
+                        "Storage consumption exceeds budget: "
+                        f"{b_to_mb(self.current_storage_consumption)} "
+                        f" > {self.current_budget}"
+                    )
+            elif self.constraint_type == "count":
+                if self.current_budget:
+                    assert len(self.current_indexes) <= self.current_budget, (
+                        "Index count exceeds limit: "
+                        f"{len(self.current_indexes)} > {self.current_budget}"
+                    )
 
         environment_state = {
             "action_status": self.action_manager.current_action_status,

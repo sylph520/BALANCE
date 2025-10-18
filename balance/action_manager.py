@@ -35,7 +35,7 @@ class ActionManager(object):
     def get_action_space(self):
         return spaces.Discrete(self.number_of_actions)
 
-    def get_initial_valid_actions(self, workload, budget):
+    def get_initial_valid_actions(self, workload, budget, constraint_type="storage"):
         # 0 for actions not taken yet, 1 for single column index present, 0.5 for two-column index present,
         # 0.33 for three-column index present, ...
         self.current_action_status = [0 for action in range(self.number_of_columns)]
@@ -43,14 +43,15 @@ class ActionManager(object):
         self.valid_actions = [self.FORBIDDEN_ACTION for action in range(self.number_of_actions)]
         self._remaining_valid_actions = []
 
-        self._valid_actions_based_on_workload(workload)
-        self._valid_actions_based_on_budget(budget, current_storage_consumption=0)
-
         self.current_combinations = set()
+
+        self._valid_actions_based_on_workload(workload)
+        self._valid_actions_based_on_budget(budget, current_storage_consumption=0, constraint_type=constraint_type)
+
 
         return np.array(self.valid_actions)
 
-    def update_valid_actions(self, last_action, budget, current_storage_consumption):
+    def update_valid_actions(self, last_action, budget, current_storage_consumption, constraint_type="storage"):
         assert self.indexable_column_combinations_flat[last_action] not in self.current_combinations
 
         actions_index_width = len(self.indexable_column_combinations_flat[last_action])
@@ -75,24 +76,40 @@ class ActionManager(object):
             self._remaining_valid_actions.remove(last_action)
 
         self._valid_actions_based_on_last_action(last_action)
-        self._valid_actions_based_on_budget(budget, current_storage_consumption)
+        self._valid_actions_based_on_budget(budget, current_storage_consumption, constraint_type=constraint_type)
 
         is_valid_action_left = len(self._remaining_valid_actions) > 0
 
         return np.array(self.valid_actions), is_valid_action_left
 
-    def _valid_actions_based_on_budget(self, budget, current_storage_consumption):
-        if budget is None:
-            return
-        else:
-            new_remaining_actions = []
-            for action_idx in self._remaining_valid_actions:
-                if b_to_mb(current_storage_consumption + self.action_storage_consumptions[action_idx]) > budget:
-                    self.valid_actions[action_idx] = self.FORBIDDEN_ACTION
-                else:
-                    new_remaining_actions.append(action_idx)
+    def _valid_actions_based_on_budget(self, budget, current_storage_consumption, constraint_type="storage"):
+        if constraint_type == "storage":
+            if budget is None:
+                return
+            else:
+                new_remaining_actions = []
+                for action_idx in self._remaining_valid_actions:
+                    if b_to_mb(current_storage_consumption + self.action_storage_consumptions[action_idx]) > budget:
+                        self.valid_actions[action_idx] = self.FORBIDDEN_ACTION
+                    else:
+                        new_remaining_actions.append(action_idx)
 
-            self._remaining_valid_actions = new_remaining_actions
+                self._remaining_valid_actions = new_remaining_actions
+        elif constraint_type == "count":
+            if budget is None:  # budget parameter now represents the index limit for count constraint
+                return
+            else:
+                new_remaining_actions = []
+                for action_idx in self._remaining_valid_actions:
+                    # For count constraint, we just check if we can add one more index (current_combinations + 1)
+                    if len(self.current_combinations) + 1 > budget:  # budget is now the index limit
+                        self.valid_actions[action_idx] = self.FORBIDDEN_ACTION
+                    else:
+                        new_remaining_actions.append(action_idx)
+
+                self._remaining_valid_actions = new_remaining_actions
+        else:
+            raise ValueError(f"constraint type {constraint_type} not supported!")
 
     def _valid_actions_based_on_workload(self, workload):
         raise NotImplementedError
@@ -129,7 +146,7 @@ class DRLindaActionManager(ActionManager):
     def get_action_space(self):
         return spaces.Discrete(self.number_of_actions)
 
-    def get_initial_valid_actions(self, workload, budget):
+    def get_initial_valid_actions(self, workload, budget, constraint_type="storage"):
         # 0 for actions not taken yet, 1 for single column index present
         self.current_action_status = [0 for action in range(self.number_of_columns)]
 
@@ -140,7 +157,7 @@ class DRLindaActionManager(ActionManager):
 
         return np.array(self.valid_actions)
 
-    def update_valid_actions(self, last_action, budget, current_storage_consumption):
+    def update_valid_actions(self, last_action, budget, current_storage_consumption, constraint_type="storage"):
         assert self.indexable_column_combinations_flat[last_action] not in self.current_combinations
 
         # actions_index_width = len(self.indexable_column_combinations_flat[last_action])
@@ -304,7 +321,7 @@ class MultiColumnIndexActionManagerNonMasking(ActionManager):
             cc = str(column_combination)
             self.column_combination_to_idx[cc] = idx
 
-    def update_valid_actions(self, last_action, budget, current_storage_consumption):
+    def update_valid_actions(self, last_action, budget, current_storage_consumption, constraint_type="storage"):
         assert self.indexable_column_combinations_flat[last_action] not in self.current_combinations
 
         last_action_column_combination = self.indexable_column_combinations_flat[last_action]
@@ -317,7 +334,7 @@ class MultiColumnIndexActionManagerNonMasking(ActionManager):
         self.current_combinations.add(self.indexable_column_combinations_flat[last_action])
 
         self._valid_actions_based_on_last_action(last_action)
-        self._valid_actions_based_on_budget(budget, current_storage_consumption)
+        self._valid_actions_based_on_budget(budget, current_storage_consumption, constraint_type=constraint_type)
 
         return np.array(self.valid_actions), True
 
