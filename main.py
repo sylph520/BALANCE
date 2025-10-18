@@ -25,24 +25,30 @@ if __name__ == "__main__":
     # CONFIGURATION_FILE = "experiments/tpcds.json"
 
     logging.warning("use gpu:" + use_gpu)
+    # setup the experiment from configuration, random seed, and related method info
+    # create or replace experiment result folder
     experiment = Experiment(CONFIGURATION_FILE)
 
     if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
         from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
         from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
         from stable_baselines.ppo2 import ppo2, ppo2_BALANCE
-        algorithm_class = ppo2_BALANCE.PPO2
-        source_algorithm_class = ppo2_BALANCE.PPO2
-    elif experiment.config["rl_algorithm"]["stable_baselines_version"] == 3:
-        from stable_baselines3.common.callbacks import EvalCallbackWithTBRunningAverage
-        from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
+        # algorithm_class = ppo2_BALANCE.PPO2
+        # source_algorithm_class = ppo2_BALANCE.PPO2
+        algorithm_class = ppo2.PPO2
+        source_algorithm_class = ppo2.PPO2
+    # elif experiment.config["rl_algorithm"]["stable_baselines_version"] == 3:
+    #     from stable_baselines3.common.callbacks import EvalCallbackWithTBRunningAverage
+    #     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 
-        algorithm_class = getattr(
-            importlib.import_module("stable_baselines3"), experiment.config["rl_algorithm"]["algorithm"]
-        )
+    #     algorithm_class = getattr(
+    #         importlib.import_module("stable_baselines3"), experiment.config["rl_algorithm"]["algorithm"]
+    #     )
     else:
         raise ValueError
 
+    # setup self.schema, self.workload_generator (for training, validation and testing)
+    # experiment budgets (randomly selected from fixed lists), and self.embedder
     experiment.prepare()
     with open(f"{experiment.experiment_folder_path}/experiment_object.pickle", "wb") as handle:
         pickle.dump(experiment, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -59,38 +65,52 @@ if __name__ == "__main__":
     experiment.source_model_type = source_algorithm_class
     experiment.model_type = algorithm_class
 
-    path1 = "./experiment_results/source"
-    path2 = "./experiment_results/source"
-    path3 = "./experiment_results/source"
+    if len(experiment.model_pool) > 0:
+        path1 = "./experiment_results/source"
+        path2 = "./experiment_results/source"
+        path3 = "./experiment_results/source"
 
-    experiment.Smodel_1 = experiment.source_model_type.load(path1 + "/f_s1.zip")
-    experiment.Smodel_1.training = False
-    experiment.Smodel_2 = experiment.source_model_type.load(path2 + "/f_s2.zip")
-    experiment.Smodel_2.training = False
-    experiment.Smodel_3 = experiment.source_model_type.load(path3 + "/f_s3.zip")
-    experiment.Smodel_3.training = False
+        experiment.Smodel_1 = experiment.source_model_type.load(path1 + "/f_s1.zip")
+        experiment.Smodel_1.training = False
+        experiment.Smodel_2 = experiment.source_model_type.load(path2 + "/f_s2.zip")
+        experiment.Smodel_2.training = False
+        experiment.Smodel_3 = experiment.source_model_type.load(path3 + "/f_s3.zip")
+        experiment.Smodel_3.training = False
 
-    temac.append(experiment.Smodel_1)
-    temac.append(experiment.Smodel_2)
-    temac.append(experiment.Smodel_3)
+        temac.append(experiment.Smodel_1)
+        temac.append(experiment.Smodel_2)
+        temac.append(experiment.Smodel_3)
 
-    model: ppo2 = algorithm_class(
-        policy=experiment.config["rl_algorithm"]["policy"],
-        env=training_env,
-        verbose=2,
-        seed=experiment.config["random_seed"],
-        gamma=experiment.config["rl_algorithm"]["gamma"],
-        tensorboard_log="tensor_log",
-        acc=temac,
-        policy_kwargs=copy.copy(
-            experiment.config["rl_algorithm"]["model_architecture"]
-        ),  # This is necessary because SB modifies the passed dict.
-        **experiment.config["rl_algorithm"]["args"],
-    )
+        model: ppo2_BALANCE.PPO2 = algorithm_class(
+            policy=experiment.config["rl_algorithm"]["policy"],
+            env=training_env,
+            verbose=2,
+            seed=experiment.config["random_seed"],
+            gamma=experiment.config["rl_algorithm"]["gamma"],
+            tensorboard_log="tensor_log",
+            acc=temac,
+            policy_kwargs=copy.copy(
+                experiment.config["rl_algorithm"]["model_architecture"]
+            ),  # This is necessary because SB modifies the passed dict.
+            **experiment.config["rl_algorithm"]["args"],
+        )
+    else:
+        model: ppo2.PPO2 = ppo2.PPO2(
+            policy=experiment.config["rl_algorithm"]["policy"],
+            env=training_env,
+            verbose=2,
+            seed=experiment.config["random_seed"],
+            gamma=experiment.config["rl_algorithm"]["gamma"],
+            tensorboard_log="tensor_log",
+            policy_kwargs=copy.copy(
+                experiment.config["rl_algorithm"]["model_architecture"]
+            ),  # This is necessary because SB modifies the passed dict.
+            **experiment.config["rl_algorithm"]["args"],
+            )
     logging.warning(f"Creating model with NN architecture: {experiment.config['rl_algorithm']['model_architecture']}")
 
     experiment.set_model(model)
-    experiment.compare()
+    # experiment.compare()
 
     callback_test_env = VecNormalize(
         DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)]),

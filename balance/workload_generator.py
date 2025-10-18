@@ -56,7 +56,7 @@ class WorkloadGenerator(object):
         self.query_texts = self._retrieve_query_texts_random_value()
         self.query_classes = set(range(1, self.number_of_query_classes + 1))
         self.available_query_classes = self.query_classes - self.excluded_query_classes
-        
+
         self.globally_indexable_columns = self._select_indexable_columns(self.filter_utilized_columns)
 
         validation_instances = config["validation_testing"]["number_of_workloads"]
@@ -64,6 +64,7 @@ class WorkloadGenerator(object):
         self.wl_validation = []
         self.wl_testing = []
 
+        # __import__('pdb').set_trace()
         if config["similar_workloads"] and config["unknown_queries"] == 0:  # similar workloads with all known queries
             # Todo: this branch can probably be removed
             assert self.varying_frequencies, "Similar workloads can only be created with varying frequencies."
@@ -179,7 +180,7 @@ class WorkloadGenerator(object):
             logging.critical(f"Global unknown query classes: {sorted(self.unknown_query_classes)}")
             logging.critical(f"Global known query classes: {sorted(self.known_query_classes)}")
 
-            
+
             _, wl_validation, wl_testing = self._generate_workloads(
                     0,
                     validation_instances,
@@ -256,7 +257,7 @@ class WorkloadGenerator(object):
         elif self.benchmark == "TPCDS":
             return 99
         elif self.benchmark == "JOB":
-            return 113
+            return 16  # return 113
         else:
             raise ValueError("Unsupported Benchmark type provided, only TPCH, TPCDS, and JOB supported.")
 
@@ -382,38 +383,39 @@ class WorkloadGenerator(object):
             len(train_workload_tuples) + len(test_workload_tuples) + len(validation_tuples) == required_unique_workloads
         )
 
-        validation_workloads = self._workloads_from_tuples(validation_tuples, unknown_query_probability)
-        test_workloads = self._workloads_from_tuples(test_workload_tuples, unknown_query_probability)
-        train_workloads = self._workloads_from_tuples(train_workload_tuples, unknown_query_probability)
 
 
-        if not os.path.exists(self.path2):
-            return train_workloads, test_workloads, validation_workloads
+        if True:
+        # if not os.path.exists(self.path2):
+            validation_workloads = self._workloads_from_tuples(validation_tuples, unknown_query_probability)
+            test_workloads = self._workloads_from_tuples(test_workload_tuples, unknown_query_probability)
+            train_workloads = self._workloads_from_tuples(train_workload_tuples, unknown_query_probability)
+            return train_workloads, validation_workloads, test_workloads
         else:
             import joblib
             pp = self.path2
             with open(pp, 'rb') as f:
-                wl1 = joblib.load(f)  # same teammples with different frequencies?
+                wl1 = joblib.load(f)  # 10000 samples with same templated queries with different frequencies?
                 f.close()
 
 
-            toto = wl1[-200:]
-            toto2 = wl1[-250:-200]
+            latest_200_samples = wl1[-200:]
+            latest_250_to_200_samples = wl1[-250:-200]
         
-            res1=[]
-            res2=[]
-            res3=[]
+            train_workloads=[]
+            test_workloads=[]
+            validation_workloads=[]
 
 
-            while len(res1)<train_instances:
-                res1.extend(self.rnd.sample(toto, 50))
+            while len(train_workloads)<train_instances:
+                train_workloads.extend(self.rnd.sample(latest_200_samples, 50))
 
-            while len(res2)<validation_instances:
-                res2.extend(self.rnd.sample(toto2, 10))
+            while len(test_workloads)<validation_instances:
+                test_workloads.extend(self.rnd.sample(latest_250_to_200_samples, 10))
 
-            while len(res3)<test_instances:
-                res3.extend(self.rnd.sample(toto2, 10))
-            return res1,res2,res3
+            while len(validation_workloads)<test_instances:
+                validation_workloads.extend(self.rnd.sample(latest_250_to_200_samples, 10))
+            return train_workloads, test_workloads, validation_workloads
 
 
     # The core idea is to create workloads that are similar and only change slightly from one to another.
@@ -491,7 +493,7 @@ class WorkloadGenerator(object):
         else:
             if len(self.available_query_classes)<size:
                 size = len(self.available_query_classes)
-            if self.gen_one>0+9:
+            if self.gen_one>0+9: # if False:
                 workload_query_classes = self.rnd.choice(self.temp_genone)
             else:
                 workload_query_classes = tuple(self.rnd.sample(self.available_query_classes, size))

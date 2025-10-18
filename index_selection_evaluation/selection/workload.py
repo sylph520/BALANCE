@@ -10,6 +10,9 @@ class Workload:
         self.idxx=idxx
 
     def indexable_columns(self, return_sorted=True):
+        """
+        return column insts from query.columns
+        """
         indexable_columns = set()
         for query in self.queries:
             indexable_columns |= set(query.columns)

@@ -6,8 +6,10 @@ from index_selection_evaluation.selection.table_generator import TableGenerator
 
 
 class Schema(object):
-    def __init__(self, benchmark_name, scale_factor, dbnames,filters={}):
+    def __init__(self, benchmark_name, scale_factor, dbnames, filters={}):
         generating_connector = PostgresDatabaseConnector(None, autocommit=True)
+
+        # obtain table_generator, create database if not exists and obtains instances of tables and columns (from ddl stmt and db conncetor)
         table_generator = TableGenerator(
             benchmark_name=benchmark_name.lower(), scale_factor=scale_factor, database_connector=generating_connector,dbname=dbnames
         )
@@ -21,10 +23,11 @@ class Schema(object):
             for column in table.columns:
                 self.columns.append(column)
 
-        for filter_name in filters.keys():
-            filter_class = getattr(importlib.import_module("balance.schema"), filter_name)
-            filter_instance = filter_class(filters[filter_name], self.database_name)
-            self.columns = filter_instance.apply_filter(self.columns)
+        if 'tpchc' not in benchmark_name.lower():
+            for filter_name in filters.keys():  # e.g., TableNumRowsFilter
+                filter_class = getattr(importlib.import_module("balance.schema"), filter_name)
+                filter_instance = filter_class(filters[filter_name], self.database_name)
+                self.columns = filter_instance.apply_filter(self.columns)
 
 
 class TableNumRowsFilter(object):

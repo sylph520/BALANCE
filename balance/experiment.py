@@ -41,6 +41,7 @@ class Experiment(object):
         self.cmp_runtime = datetime.timedelta(0)
         self.dataset_size = None
         self.model = None
+        self.model_pool = []
         self.Smodel_1 = None
         self.Smodel_2 = None
         self.Smodel_3 = None

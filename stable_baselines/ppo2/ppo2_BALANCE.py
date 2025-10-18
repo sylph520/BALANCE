@@ -93,11 +93,12 @@ class PPO2(ActorCriticRLModel):
         self.value = None
         self.n_batch = None
         self.summary = None
+
         # new start
         self.actor = acc
         self.lens = lens
         self.action_dim = None
-        
+
         self.pla_sap = []
 
         n_of_10G = 3532
@@ -105,7 +106,8 @@ class PPO2(ActorCriticRLModel):
         self.pla_sa = [[0]*n_of_1G]*16
         for i in range(16):
             self.pla_sap.append(np.array([0]*n_of_1G))
-        # new start
+        # new end
+
         tf.set_random_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
@@ -142,7 +144,7 @@ class PPO2(ActorCriticRLModel):
             with self.graph.as_default():
                 self.set_random_seed(self.seed)
                 self.sess = tf_util.make_session(num_cpu=self.n_cpu_tf_sess, graph=self.graph)
-               
+
                 # new start
                 if self.action_dim==None:
                     ad = self.env.envs[0].observation_space.shape[0]
@@ -155,9 +157,9 @@ class PPO2(ActorCriticRLModel):
                         asi = len(self.actor)
                 else:
                     asi = self.lens
-                self.OT = CAPS(asi,ad,self.graph,self.sess)
+                self.OT = CAPS(asi, ad, self.graph, self.sess)
                 # new end
-                
+
                 n_batch_step = None
                 n_batch_train = None
                 if issubclass(self.policy, RecurrentActorCriticPolicy):
@@ -182,10 +184,12 @@ class PPO2(ActorCriticRLModel):
                     self.old_vpred_ph = tf.placeholder(tf.float32, [None], name="old_vpred_ph")
                     self.learning_rate_ph = tf.placeholder(tf.float32, [], name="learning_rate_ph")
                     self.clip_range_ph = tf.placeholder(tf.float32, [], name="clip_range_ph")
+
                     # new start
                     self.s_a_prob = tf.placeholder_with_default(tf.convert_to_tensor(np.zeros([1,1]),dtype=tf.float32), shape=[None,None], name='s_a_prob') ###
                     self.source_workload_mask = tf.placeholder(dtype=tf.float32, shape=[None,None], name='source_workload_mask')
                     # new end
+
                     self.neglogpac = train_model.proba_distribution.neglogp(self.action_ph)
                     self.entropy = tf.reduce_mean(train_model.proba_distribution.entropy())
 
@@ -228,11 +232,11 @@ class PPO2(ActorCriticRLModel):
                     self.approxkl = .5 * tf.reduce_mean(tf.square(self.neglogpac - self.old_neglog_pac_ph))
                     self.clipfrac = tf.reduce_mean(tf.cast(tf.greater(tf.abs(self.ratio - 1.0),
                                                                       self.clip_range_ph), tf.float32))
+
                     # new start: change loss computation
                     asl = train_model.proba_distribution.logits
                     one_hot_actions = tf.one_hot(self.action_ph, asl.get_shape().as_list()[-1])
                     one_hot_actions = tf.stop_gradient(one_hot_actions)
-                    
 
                     # Prevent invalid actions backpropagation
                     asl = tf.multiply(asl, self.train_model.action_mask_ph)
@@ -247,14 +251,13 @@ class PPO2(ActorCriticRLModel):
                     #############################
                     self.e = tf.placeholder(tf.float32, (), 'e')
                     self.op_w = tf.placeholder(tf.float32, shape=[None,None], name='op_w')
-                    
+
                     self.opops1 = [1,1,1]
                     self.opops2 = [1/(3-i) for i in self.opops1]
-                    
-                    
+
                     self.flag_wlm = False
                     self.ptf = 1
-                    
+
                     self.weight =  tf.tanh( tf.nn.relu( 9 - (0.1 * self.e  ) ) )
                     self.mysof = tf.nn.softmax(self.train_model.proba_distribution.logits)
 
@@ -268,12 +271,11 @@ class PPO2(ActorCriticRLModel):
                             self.tempsss = self.tempss*self.source_workload_mask
                         else:
                             self.tempsss = self.tempss
-                        
+
                         self.myklloss = tf.reduce_sum(self.tempsss)
                         self.myklloss = self.myklloss * self.weight * 0.05 *self.ptf
                     else:
                         self.myklloss=0
-                    
 
                     loss = self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef + self.myklloss * 0.05
 
@@ -294,6 +296,7 @@ class PPO2(ActorCriticRLModel):
                             for var in self.params:
                                 tf.summary.histogram(var.name, var)
                     grads = tf.gradients(loss, self.params)
+
                     # NEW start
                     # if self.max_grad_norm is not None:
                     #     grads, _grad_norm = tf.clip_by_global_norm(grads, self.max_grad_norm)
@@ -302,6 +305,7 @@ class PPO2(ActorCriticRLModel):
                     grads_fast = tf.gradients(loss_fast, self.params)
                     grads_fast = list(zip(grads_fast, self.params))
                     # NEW end
+
                 trainer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_ph, epsilon=1e-5)
                 self._train = trainer.apply_gradients(grads)
 
@@ -346,12 +350,10 @@ class PPO2(ActorCriticRLModel):
                 asl = self.train_model.proba_distribution.logits
                 self.my_nosoftmax = asl
 
-
-
     def act_prob_nosoftmax(self,  obs,  masks, actions, action_masks
                     , states=None, cliprange_vf=None):
         td_map = {self.train_model.obs_ph: obs, self.action_ph: actions,
-                  
+
                   self.train_model.action_mask_ph: action_masks
                   }
         if states is not None:
@@ -360,7 +362,6 @@ class PPO2(ActorCriticRLModel):
 
         if cliprange_vf is not None and cliprange_vf >= 0:
             td_map[self.clip_range_vf_ph] = cliprange_vf
-        
 
         summary = self.sess.run(
                     [self.my_nosoftmax],
@@ -468,7 +469,7 @@ class PPO2(ActorCriticRLModel):
             source_workload_mask = []
             mu = []
             sigma = []
-            
+
             advs = returns - values
             advs = (advs - advs.mean()) / (advs.std() + 1e-8)
             td_map = {self.train_model.obs_ph: obs, self.action_ph: actions,
@@ -519,7 +520,7 @@ class PPO2(ActorCriticRLModel):
         self.learning_rate = get_schedule_fn(self.learning_rate)
         self.cliprange = get_schedule_fn(self.cliprange)
         cliprange_vf = get_schedule_fn(self.cliprange_vf)
-        
+
         # new start
         time_test_sum = datetime.timedelta(0)
         sum_count_test = 0
@@ -620,8 +621,7 @@ class PPO2(ActorCriticRLModel):
                                                 true_reward.reshape((self.n_envs, self.n_steps)),
                                                 masks.reshape((self.n_envs, self.n_steps)),
                                                 writer, self.num_timesteps)
-                
-                
+
                 if self.verbose >= 1 and (update % log_interval == 0 or update == 1):
                     explained_var = explained_variance(values, returns)
                     logger.logkv("serial_timesteps", update * self.n_steps)
@@ -735,7 +735,7 @@ class Runner(AbstractEnvRunner):
             opa = np.array(
                     [1 if i == option or self.model.actor[i].step(self.obs, self.states, self.dones, action_mask=self.action_masks)[0][0] == actions[0] else 0 for i in range(len(self.model.actor))]
                 )
-            
+
             mb_obs.append(self.obs.copy())
             mb_actions.append(actions)
             mb_values.append(values)
@@ -747,8 +747,8 @@ class Runner(AbstractEnvRunner):
             # Clip the actions to avoid out of bound error
             if isinstance(self.env.action_space, gym.spaces.Box):
                 clipped_actions = np.clip(actions, self.env.action_space.low, self.env.action_space.high)
-            
-            
+
+
             startflag = False
             self.obs[:], rewards, self.dones, infos = self.env.step(clipped_actions,start=startflag)
 
@@ -893,13 +893,13 @@ class ReplayBuffer(object):
 
 class CAPS:
     def __init__(self, option_dim, n_features, graph,sess=None):
-      with graph.as_default():  
+      with graph.as_default():
         self.args = args={'replace_target_iter':1000,'e_greedy':0.95,'e_greedy_increment':0.0005,'start_greedy':0.0,
         'optimizer':'adam','learning_rate_o':0.001,'learning_rate_t':0.001,'memory_size':200000,'reward_decay':0.99,'clip_value':0.2,
         'xi':0,'option_batch_size':16,'option_layer_1':32}
         self.option_dim = option_dim
         self.n_features = n_features
-        
+
         self.update_step = 0
         self.replace_target_iter = args['replace_target_iter']
         self.e_greedy = args['e_greedy']
@@ -945,7 +945,7 @@ class CAPS:
             if self.args['xi'] == 0:
                 if(option_dim==1):
                     xi = 0.8 * (max_q_omega_next - tf.nn.top_k(self.q_omega_next_current, 1)[0][:, 0])
-                else:    
+                else:
                     xi = 0.8 * (max_q_omega_next - tf.nn.top_k(self.q_omega_next_current, 2)[0][:, 1])
                     # 5.3  5.2
             else:
@@ -966,10 +966,9 @@ class CAPS:
                 if grad is not None:
                     gradients_t[i] = (tf.clip_by_norm(grad, args['clip_value']), var)
             self.update_t = self.Opt_T.apply_gradients(gradients_t)
-            
 
         self.replace_target_op = [tf.assign(t, e) for t, e in zip(self.target_q_func_vars, self.q_func_vars)]
-        
+
         self.sess = sess
 
     def _build_net(self, scope, s, reuse=False):
@@ -978,11 +977,11 @@ class CAPS:
             l_a = tf.layers.dense(s, self.args['option_layer_1'], tf.nn.relu6, kernel_initializer=w_init, name='la')
             with tf.variable_scope("option_value"):
                 q_omega = tf.layers.dense(l_a, self.option_dim, tf.nn.tanh, kernel_initializer=w_init, name='omega_value')
-                
+
             with tf.variable_scope("termination_prob"):
                 term_prob = tf.layers.dense(l_a, self.option_dim, tf.sigmoid, kernel_initializer=w_init,
                                           name='term_prob')
-                
+
         return q_omega, term_prob
 
     def store_transition(self, observation, action, reward, done, observation_, opa):
@@ -995,7 +994,7 @@ class CAPS:
         if np.random.uniform() < self.epsilon:
             options = self.sess.run(self.q_omega_current, feed_dict={self.s: s})
             options = options[0]
-            
+
             return np.argmax(options)
         else:
             return np.random.randint(0, self.option_dim)
@@ -1016,7 +1015,7 @@ class CAPS:
             loss_term, _ = self.sess.run([self.total_error_term, self.update_t], feed_dict={
                 self.s: observation,
                 self.option_o: [option],
-                
+
                 self.s_: observation_,
                 self.done: [1.0 if done is True else 0.0]
             })
