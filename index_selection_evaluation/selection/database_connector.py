@@ -42,6 +42,8 @@ class DatabaseConnector:
         self.exec_only(statement)
 
     def _prepare_query(self, query):
+        # if query.text[-1] == ';':
+        #     return query.text[:-1]
         for query_statement in query.text.split(";"):
             if "create view" in query_statement:
                 try:

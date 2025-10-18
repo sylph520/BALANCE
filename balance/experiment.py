@@ -15,6 +15,7 @@ from gym_db.common import EnvironmentType
 from index_selection_evaluation.selection.algorithms.db2advis_algorithm import DB2AdvisAlgorithm
 from index_selection_evaluation.selection.algorithms.extend_algorithm import ExtendAlgorithm
 from index_selection_evaluation.selection.dbms.postgres_dbms import PostgresDatabaseConnector
+from index_selection_evaluation.selection.workload import Workload
 
 from . import utils
 from .configuration_parser import ConfigurationParser
@@ -110,7 +111,7 @@ class Experiment(object):
             workload_embedder_connector = PostgresDatabaseConnector(self.schema.database_name, autocommit=True)
             self.workload_embedder = workload_embedder_class(
                 self.workload_generator.query_texts,
-                40, # 40 = representation size(50) - value size(10) 
+                40, # 40 = representation size(50) - value size(10)
                 workload_embedder_connector,
                 self.globally_indexable_columns,
             )
@@ -155,7 +156,9 @@ class Experiment(object):
         
         self.schema.database_name = self.config["database"]
 
-        self.test_fm = self.test_model(self.model)[0]
+        test_wl = self.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
+        test_wl.budget = 3
+        self.test_fm = self.test_model(self.model, wl_testing=[[test_wl]])[0]
         self.vali_fm = self.validate_model(self.model)[0]
 
         self.moving_average_model = self.model_type.load(f"{self.experiment_folder_path}/moving_average_model.zip")
@@ -621,10 +624,13 @@ class Experiment(object):
                     self.comparison_performances[run_type]["Extend"][-1].append(extend_algorithm.final_cost_proportion)
 
     # todo: code duplication with validate_model
-    def test_model(self, model):
+    def test_model(self, model, wl_testing = None):
         """run tests over testing workloads"""
         model_performances = []
-        for test_wl in self.workload_generator.wl_testing:
+
+        if not wl_testing:
+            wl_testing = self.workload_generator.wl_testing
+        for test_wl in wl_testing:
             test_env = self.DummyVecEnv([self.make_env(0, EnvironmentType.TESTING, test_wl)])
             test_env = self.VecNormalize(
                 test_env, norm_obs=True, norm_reward=False, gamma=self.config["rl_algorithm"]["gamma"], training=False
