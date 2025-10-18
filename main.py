@@ -20,6 +20,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--wk_type', type=str, default='tpch')
     parser.add_argument('--config', type=str, help='Path to configuration file (overrides wk_type)')
+    parser.add_argument('--load_model', type=str, help='Path to saved model to test instead of training')
+    parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
     args = parser.parse_args()
 
     if args.config:
@@ -31,7 +33,80 @@ if __name__ == "__main__":
     logging.warning("use gpu:" + use_gpu)
     # setup the experiment from configuration, random seed, and related method info
     # create or replace experiment result folder
-    experiment = Experiment(CONFIGURATION_FILE)
+    # If test_only flag is set, initialize experiment without folder deletion for testing
+    # __import__('ipdb').set_trace()
+    if args.test_only:
+        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True)
+        import os
+        from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
+
+        # Prepare the experiment (this may be needed for environment setup)
+        experiment.prepare()
+
+        # Infer experiment folder name from config id
+        experiment_base_name = experiment.id  # This comes from config["id"]
+
+        # Look for the latest experiment folder with this name
+        folder_path = f"experiment_results/ID_{experiment_base_name}"
+
+        if os.path.exists(folder_path):
+            # Get the most recent folder (by modification time)
+            model_path = os.path.join(folder_path, "final_model.zip")
+
+            if os.path.exists(model_path):
+                logging.info(f"Loading model from: {model_path}")
+
+                # Set up model_type before loading (this is normally done later in the code)
+                if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
+                    from stable_baselines.ppo2 import ppo2, ppo2_BALANCE
+                    algorithm_class = ppo2.PPO2
+                    experiment.model_type = algorithm_class
+                    experiment.source_model_type = algorithm_class
+                else:
+                    raise ValueError
+
+                # Load the saved model
+                model = experiment.model_type.load(model_path)
+
+                # Create test environment with default testing workloads
+                test_env = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
+                test_env = VecNormalize(
+                    test_env,
+                    norm_obs=True,
+                    norm_reward=False,
+                    gamma=experiment.config["rl_algorithm"]["gamma"],
+                    training=False
+                )
+
+                model.set_env(test_env)
+                # Load and apply normalization if available
+                vec_norm_path = os.path.join(folder_path, "vec_normalize.pkl")
+                if os.path.exists(vec_norm_path):
+                    test_env = VecNormalize.load(vec_norm_path, test_env)
+                    test_env.training = False
+                    test_env.norm_reward = False
+
+                # Sync environments and evaluate (only if training_env exists)
+                training_env = model.get_vec_normalize_env()
+                if training_env is not None:
+                    experiment.sync_envs_normalization(training_env, test_env)
+
+                # Run evaluation
+                n_eval_episodes = experiment.config["workload"]["validation_testing"]["number_of_workloads"]
+                episode_performances = experiment._evaluate_model(model, test_env, n_eval_episodes)
+
+                logging.info(f"Evaluation completed. Performance: {episode_performances}")
+                print(f"Mean performance: {episode_performances[1]:.2f}")
+
+                # Exit after testing if only testing was requested
+                exit(0)
+            else:
+                logging.warning(f"No saved model found at {model_path}, proceeding with training")
+        else:
+            logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
+    else:
+        # Normal training mode
+        experiment = Experiment(CONFIGURATION_FILE)
 
     if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
         from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
@@ -41,13 +116,6 @@ if __name__ == "__main__":
         # source_algorithm_class = ppo2_BALANCE.PPO2
         algorithm_class = ppo2.PPO2
         source_algorithm_class = ppo2.PPO2
-    # elif experiment.config["rl_algorithm"]["stable_baselines_version"] == 3:
-    #     from stable_baselines3.common.callbacks import EvalCallbackWithTBRunningAverage
-    #     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
-
-    #     algorithm_class = getattr(
-    #         importlib.import_module("stable_baselines3"), experiment.config["rl_algorithm"]["algorithm"]
-    #     )
     else:
         raise ValueError
 

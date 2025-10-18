@@ -23,11 +23,12 @@ from .schema import Schema
 from .workload_generator import WorkloadGenerator
 
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None):
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False):
         """
         setup the experiment from configuration, random seed, and related method info
         """
         self._init_times()
+        self.skip_folder_creation = skip_folder_creation
 
         cp = ConfigurationParser(configuration_file)
         self.config = cp.config
@@ -127,7 +128,7 @@ class Experiment(object):
         """
         for workload_list in self.workload_generator.wl_testing:
             for workload in workload_list:
-                workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])  
+                workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])
 
         for workload_list in self.workload_generator.wl_validation:
             for workload in workload_list:
@@ -269,11 +270,19 @@ class Experiment(object):
             self.EXPERIMENT_RESULT_PATH
         ), f"Folder for experiment results should exist at: ./{self.EXPERIMENT_RESULT_PATH}"
 
-        self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}"
+        # __import__('ipdb').set_trace()
+        self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}"
         import shutil
-        if(os.path.isdir(self.experiment_folder_path) == True): 
-            shutil.rmtree(self.experiment_folder_path, ignore_errors=True)
-        os.mkdir(self.experiment_folder_path)
+
+        # Only delete and recreate folder if not in test mode
+        if not getattr(self, 'skip_folder_creation', False):
+            if(os.path.isdir(self.experiment_folder_path) == True):
+                shutil.rmtree(self.experiment_folder_path, ignore_errors=True)
+            os.mkdir(self.experiment_folder_path)
+        else:
+            # When testing, just make sure the folder exists
+            if not os.path.exists(self.experiment_folder_path):
+                os.makedirs(self.experiment_folder_path, exist_ok=True)
 
     def _write_report(self,dbname):
         with open(f"{self.experiment_folder_path}/report_ID_{self.id}_{dbname}.txt", "w") as f:
