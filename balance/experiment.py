@@ -23,7 +23,7 @@ from .schema import Schema
 from .workload_generator import WorkloadGenerator
 
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False):
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0):
         """
         setup the experiment from configuration, random seed, and related method info
         """
@@ -32,6 +32,10 @@ class Experiment(object):
 
         cp = ConfigurationParser(configuration_file)
         self.config = cp.config
+        if uni_freq:
+            self.config['workload']['varying_frequencies'] = False
+        if fix_index_count:
+            self.fix_index_count = fix_index_count
         if aa!=None:
             self.config["id"] = "TPCDS_depart_unknow_"+aa
             self.config["workload"]["unknown_queries"] = int(aa)
@@ -128,11 +132,17 @@ class Experiment(object):
         """
         for workload_list in self.workload_generator.wl_testing:
             for workload in workload_list:
-                workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])
+                if self.fix_index_count:
+                    workload.budget = self.fix_index_count
+                else:
+                    workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])
 
         for workload_list in self.workload_generator.wl_validation:
             for workload in workload_list:
-                workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])
+                if self.fix_index_count:
+                    workload.budget = self.fix_index_count
+                else:
+                    workload.budget = self.rnd.choice(self.config["budgets"]["validation_and_testing"])
 
     def _pickle_workloads(self):
         """
@@ -274,7 +284,15 @@ class Experiment(object):
         ), f"Folder for experiment results should exist at: ./{self.EXPERIMENT_RESULT_PATH}"
 
         # __import__('ipdb').set_trace()
-        self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}"
+        # self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}"
+        self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}_ts{self.config['timesteps']}"
+        if self.config['workload']['varying_frequencies']:
+            self.experiment_folder_path += '_varyFreq'
+        else:
+            self.experiment_folder_path += '_uniFreq'
+        if self.fix_index_count:
+            self.experiment_folder_path += f'_idxmax{self.fix_index_count}'
+
         import shutil
 
         # Only delete and recreate folder if not in test mode

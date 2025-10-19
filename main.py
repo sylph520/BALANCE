@@ -22,6 +22,8 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, help='Path to configuration file (overrides wk_type)')
     parser.add_argument('--load_model', type=str, help='Path to saved model to test instead of training')
     parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
+    parser.add_argument('--uni_freq', action='store_true', default=False)
+    parser.add_argument('--fix_index_count', type=int, default=0)
     args = parser.parse_args()
 
     if args.config:
@@ -36,7 +38,7 @@ if __name__ == "__main__":
     # If test_only flag is set, initialize experiment without folder deletion for testing
     # __import__('ipdb').set_trace()
     if args.test_only:
-        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True)
+        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count)
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
@@ -70,10 +72,19 @@ if __name__ == "__main__":
                 model = experiment.model_type.load(model_path)
                 experiment.set_model(model)
 
-                test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
-                test_wl.budget = 3
+                custom_wl = False
+                custom_wl = True
                 # Create test environment with default testing workloads
-                test_env = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
+                if custom_wl:
+                    if not args.uni_freq:
+                        test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
+                    else:
+                        test_wl = experiment.workload_generator._workloads_from_tuples([tuple(([20, 5, 17, 2, 4, 19, 3, 1, 10, 16, 15, 11, 12, 13, 18, 6, 14, 7, 9, 8], [1]*20))])[0]
+                    test_wl.budget = 3
+                    test_env = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
+                else:
+                    test_env = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
+
                 test_env = VecNormalize(
                     test_env,
                     norm_obs=True,
@@ -112,7 +123,7 @@ if __name__ == "__main__":
             logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
     else:
         # Normal training mode
-        experiment = Experiment(CONFIGURATION_FILE)
+        experiment = Experiment(CONFIGURATION_FILE, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count)
 
     if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
         from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
@@ -252,7 +263,7 @@ if __name__ == "__main__":
     model.learn(
         total_timesteps=experiment.config["timesteps"],
         callback=callbacks,
-        tb_log_name=experiment.id, ids=experiment.config["id"]
+        tb_log_name=experiment.experiment_folder_path, ids=experiment.config["id"]
     )
     experiment.finish_learning(
         training_env,

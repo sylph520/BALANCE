@@ -369,19 +369,26 @@ class WorkloadGenerator(object):
         while required_unique_workloads > len(unique_workload_tuples):
             workload_tuple = self._generate_random_workload(size, unknown_query_probability)
             unique_workload_tuples.add(workload_tuple)
+            if not self.varying_frequencies:
+                validation_instances = 1
+                test_instances = 1
+                break
+
+        if self.varying_frequencies:
+            unique_workload_tuples = unique_workload_tuples - set(validation_tuples)
+            unique_workload_tuples = unique_workload_tuples - set(test_workload_tuples)
 
         validation_tuples = self.rnd.sample(unique_workload_tuples, validation_instances)
-        unique_workload_tuples = unique_workload_tuples - set(validation_tuples)
-
         test_workload_tuples = self.rnd.sample(unique_workload_tuples, test_instances)
-        unique_workload_tuples = unique_workload_tuples - set(test_workload_tuples)
 
-        assert len(unique_workload_tuples) == train_instances
+        if self.varying_frequencies:
+            assert len(unique_workload_tuples) == train_instances
         train_workload_tuples = unique_workload_tuples
 
-        assert (
-            len(train_workload_tuples) + len(test_workload_tuples) + len(validation_tuples) == required_unique_workloads
-        )
+        if self.varying_frequencies:
+            assert (
+                len(train_workload_tuples) + len(test_workload_tuples) + len(validation_tuples) == required_unique_workloads
+            )
 
 
 
