@@ -31,6 +31,8 @@ if __name__ == "__main__":
     parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
     parser.add_argument('--uni_freq', action='store_true', default=False)
     parser.add_argument('--fix_index_count', type=int, default=0)
+    parser.add_argument('--test_workload', type=str, help='Path to a .sql file to use as a custom test workload.')
+    parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
     args = parser.parse_args()
 
     if args.config:
@@ -78,20 +80,34 @@ if __name__ == "__main__":
                 # Load the saved model
                 model = experiment.model_type.load(model_path)
 
-                # custom_wl = False
-                custom_wl = True
-                # Create test environment with default or custom workloads
-                if custom_wl:
-                    logging.info("Using custom hardcoded test workload.")
-                    if not args.uni_freq:
-                        test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
-                    else:
-                        test_wl = experiment.workload_generator._workloads_from_tuples([tuple(([20, 5, 17, 2, 4, 19, 3, 1, 10, 16, 15, 11, 12, 13, 18, 6, 14, 7, 9, 8], [1]*20))])[0]
-                    test_wl.budget = 3
+                if args.test_workload:
+                    logging.info(f"Using custom test workload from file: {args.test_workload}")
+                    query_ids = None
+                    if args.test_workload_qids:
+                        try:
+                            query_ids = [int(qid.strip()) for qid in args.test_workload_qids.split(',')]
+                        except ValueError:
+                            logging.error("Invalid format for --test_workload_qids. Please provide a comma-separated list of integers.")
+                            exit(1)
+                    test_wl = experiment.workload_from_sql_file(args.test_workload, selection_qids=query_ids)
+                    if args.fix_index_count > 0:
+                        test_wl.budget = args.fix_index_count
                     test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
                 else:
-                    logging.info("Using default test workload from configuration.")
-                    test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
+                    # custom_wl = False
+                    custom_wl = True
+                    # Create test environment with default or custom workloads
+                    if custom_wl:
+                        logging.info("Using custom hardcoded test workload.")
+                        if not args.uni_freq:
+                            test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
+                        else:
+                            test_wl = experiment.workload_generator._workloads_from_tuples([tuple(([20, 5, 17, 2, 4, 19, 3, 1, 10, 16, 15, 11, 12, 13, 18, 6, 14, 7, 9, 8], [1]*20))])[0]
+                        test_wl.budget = 3
+                        test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
+                    else:
+                        logging.info("Using default test workload from configuration.")
+                        test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
 
                 # Path to the normalization stats
                 vec_norm_path = os.path.join(folder_path, "vec_normalize.pkl")

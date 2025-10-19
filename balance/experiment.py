@@ -70,6 +70,43 @@ class Experiment(object):
         self.EXPERIMENT_RESULT_PATH = self.config["result_path"]
         self._create_experiment_folder()
 
+    def workload_from_sql_file(self, filepath, selection_qids=None):
+        from index_selection_evaluation.selection.workload import Query, Workload
+        import sqlparse
+        import os
+        import logging
+
+        with open(filepath, 'r') as f:
+            content = f.read()
+
+        # Step 1: Load all queries from the file and create a pool, indexed by their file order (1-based).
+        sql_statements = [s.strip() for s in sqlparse.split(content) if s.strip()]
+        query_pool = {}
+        for i, sql in enumerate(sql_statements):
+            query_nr = i + 1 # Assign ID 1, 2, 3, ... based on file order
+            query = Query(query_nr, sql, frequency=1)
+            self.workload_generator._store_indexable_columns(query)
+            query_pool[query_nr] = query
+
+        # Step 2: Use the selection_qids to build the final workload.
+        final_queries = []
+        if selection_qids:
+            for qid in selection_qids:
+                if qid in query_pool:
+                    final_queries.append(query_pool[qid])
+                else:
+                    logging.warning(f"Query ID {qid} from --test_workload_qids not found in {filepath}. Skipping.")
+        else:
+            # If no qids are provided, just use all queries in their original order.
+            for i in range(len(sql_statements)):
+                final_queries.append(query_pool[i+1])
+
+        if not final_queries:
+            logging.error(f"Could not create a workload from {filepath}. No valid queries found.")
+            return Workload([], description=f"Empty workload from {filepath}")
+
+        return Workload(final_queries, description=f"Custom workload from {os.path.basename(filepath)}")
+
 
     def prepare(self):
         """
