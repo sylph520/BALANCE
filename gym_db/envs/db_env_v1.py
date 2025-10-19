@@ -179,12 +179,9 @@ class DBEnvV1(gym.Env):
 
         # Determine constraint type - storage (budget in MB) or count (number of indexes)
         self.constraint_type = self.config.get("constraint_type", "storage")
-        if self.constraint_type == "count":
-            # For count constraint, use constraint_value as the maximum number of indexes
-            self.current_budget = self.config.get("constraint_value", 10)  # default to 10 indexes
-        else:
-            # For storage constraint, use the original budget mechanism
-            self.current_budget = self.current_workload.budget
+        self.current_budget = self.current_workload.budget
+        if self.constraint_type == "count" and self.current_budget is None:
+            self.current_budget = self.rnd.randint(1, 12)
         self.previous_cost = None
 
         if self.constraint_type == "storage":
