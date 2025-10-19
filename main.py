@@ -27,6 +27,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--wk_type', type=str, default='tpch')
     parser.add_argument('--config', type=str, help='Path to configuration file (overrides wk_type)')
+    parser.add_argument('--ts', type=int, help='the number of time steps to train', default=0)
     parser.add_argument('--load_model', type=str, help='Path to saved model to test instead of training')
     parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
     parser.add_argument('--uni_freq', action='store_true', default=False)
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     # If test_only flag is set, initialize experiment without folder deletion for testing
     # __import__('ipdb').set_trace()
     if args.test_only:
-        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count)
+        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count, ts=args.ts)
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
@@ -154,7 +155,7 @@ if __name__ == "__main__":
             logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
     else:
         # Normal training mode
-        experiment = Experiment(CONFIGURATION_FILE, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count)
+        experiment = Experiment(CONFIGURATION_FILE, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count, ts=args.num_ts)
 
     if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
         from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
