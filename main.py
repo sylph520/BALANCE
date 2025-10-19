@@ -47,7 +47,8 @@ if __name__ == "__main__":
         experiment_base_name = experiment.id  # This comes from config["id"]
 
         # Look for the latest experiment folder with this name
-        folder_path = f"experiment_results/ID_{experiment_base_name}"
+        # folder_path = f"experiment_results/ID_{experiment_base_name}"
+        folder_path = experiment.experiment_folder_path
 
         if os.path.exists(folder_path):
             # Get the most recent folder (by modification time)
@@ -67,9 +68,12 @@ if __name__ == "__main__":
 
                 # Load the saved model
                 model = experiment.model_type.load(model_path)
+                experiment.set_model(model)
 
+                test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
+                test_wl.budget = 3
                 # Create test environment with default testing workloads
-                test_env = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
+                test_env = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
                 test_env = VecNormalize(
                     test_env,
                     norm_obs=True,
@@ -98,6 +102,8 @@ if __name__ == "__main__":
                 logging.info(f"Evaluation completed. Performance: {episode_performances}")
                 print(f"Mean performance: {episode_performances[1]:.2f}")
 
+                # __import__('ipdb').set_trace()
+                # experiment.finishmy(args.test_only)
                 # Exit after testing if only testing was requested
                 exit(0)
             else:

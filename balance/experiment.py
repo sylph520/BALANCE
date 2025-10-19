@@ -221,6 +221,9 @@ class Experiment(object):
         self.model = model
 
     def finish_learning(self, training_env, moving_average_model_step, best_mean_model_step):
+        """
+        update perf statics and save models
+        """
         self.training_end_time = datetime.datetime.now()
 
         self.moving_average_validation_model_at_step = moving_average_model_step
