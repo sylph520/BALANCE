@@ -6,8 +6,15 @@ import sys
 import gym_db  # noqa: F401
 from gym_db.common import EnvironmentType
 from balance.experiment import Experiment
-import os
 import argparse
+import os
+
+# For full determinism, set hash seed and seed random libraries at the start.
+os.environ['PYTHONHASHSEED'] = '0'
+import numpy as np
+np.random.seed(0)
+import random
+random.seed(0)
 
 
 use_gpu = "0"
@@ -70,36 +77,44 @@ if __name__ == "__main__":
 
                 # Load the saved model
                 model = experiment.model_type.load(model_path)
-                experiment.set_model(model)
 
-                custom_wl = False
+                # custom_wl = False
                 custom_wl = True
-                # Create test environment with default testing workloads
+                # Create test environment with default or custom workloads
                 if custom_wl:
+                    logging.info("Using custom hardcoded test workload.")
                     if not args.uni_freq:
                         test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
                     else:
                         test_wl = experiment.workload_generator._workloads_from_tuples([tuple(([20, 5, 17, 2, 4, 19, 3, 1, 10, 16, 15, 11, 12, 13, 18, 6, 14, 7, 9, 8], [1]*20))])[0]
                     test_wl.budget = 3
-                    test_env = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
+                    test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
                 else:
-                    test_env = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
+                    logging.info("Using default test workload from configuration.")
+                    test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
 
-                test_env = VecNormalize(
-                    test_env,
-                    norm_obs=True,
-                    norm_reward=False,
-                    gamma=experiment.config["rl_algorithm"]["gamma"],
-                    training=False
-                )
-
-                model.set_env(test_env)
-                # Load and apply normalization if available
+                # Path to the normalization stats
                 vec_norm_path = os.path.join(folder_path, "vec_normalize.pkl")
+
+                # Load stats if they exist, otherwise create a new VecNormalize wrapper
                 if os.path.exists(vec_norm_path):
-                    test_env = VecNormalize.load(vec_norm_path, test_env)
+                    logging.info(f"Loading normalization statistics from: {vec_norm_path}")
+                    # Load the stats and wrap the dummy environment
+                    test_env = VecNormalize.load(vec_norm_path, test_env_dummy)
                     test_env.training = False
                     test_env.norm_reward = False
+                else:
+                    logging.warning("Could not find normalization statistics. Using new VecNormalize wrapper.")
+                    # If no saved stats, create a new VecNormalize wrapper
+                    test_env = VecNormalize(
+                        test_env_dummy,
+                        norm_obs=True,
+                        norm_reward=False,
+                        gamma=experiment.config["rl_algorithm"]["gamma"],
+                        training=False
+                    )
+
+                model.set_env(test_env)
 
                 # Sync environments and evaluate (only if training_env exists)
                 training_env = model.get_vec_normalize_env()

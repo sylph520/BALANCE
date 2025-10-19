@@ -50,6 +50,7 @@ def create_column_permutation_indexes(columns, max_index_width):
             count += len(set(itertools.permutations(columns_per_table, length)))
         print(f"{length}-column indexes: {count}")
 
-        result_column_combinations.append(list(unique))
+        # Sort the list to ensure deterministic order of index candidates
+        result_column_combinations.append(sorted(list(unique), key=lambda x: str(x)))
 
     return result_column_combinations

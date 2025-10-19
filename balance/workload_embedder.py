@@ -213,7 +213,7 @@ class PlanEmbedder(WorkloadEmbedder):
         import numpy as np
         from sklearn.decomposition import PCA
         temp = []
-        pca = PCA(n_components=10)
+        pca = PCA(n_components=10, random_state=0)
         ###
         self.err = 0
         self.e =0

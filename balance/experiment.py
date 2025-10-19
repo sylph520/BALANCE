@@ -700,7 +700,7 @@ class Experiment(object):
         self.sync_envs_normalization(training_env, evaluation_env)
 
         flag1 = datetime.datetime.now()
-        self.evaluate_policy(model, evaluation_env, n_eval_episodes)
+        self.evaluate_policy(model, evaluation_env, n_eval_episodes, deterministic=True)
         flag11 = datetime.datetime.now() -flag1
         print("eval time:")
         print(flag11)
