@@ -23,7 +23,7 @@ from .schema import Schema
 from .workload_generator import WorkloadGenerator
 
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0):
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0):
         """
         setup the experiment from configuration, random seed, and related method info
         """
@@ -36,6 +36,9 @@ class Experiment(object):
             self.config['workload']['varying_frequencies'] = False
         if fix_index_count:
             self.fix_index_count = fix_index_count
+        # __import__('ipdb').set_trace()
+        if ts:
+            self.config['timesteps'] = ts
         if aa!=None:
             self.config["id"] = "TPCDS_depart_unknow_"+aa
             self.config["workload"]["unknown_queries"] = int(aa)

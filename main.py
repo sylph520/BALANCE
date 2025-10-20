@@ -155,7 +155,7 @@ if __name__ == "__main__":
             logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
     else:
         # Normal training mode
-        experiment = Experiment(CONFIGURATION_FILE, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count, ts=args.num_ts)
+        experiment = Experiment(CONFIGURATION_FILE, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count, ts=args.ts)
 
     if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
         from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
