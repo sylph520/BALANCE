@@ -22,6 +22,17 @@ from .configuration_parser import ConfigurationParser
 from .schema import Schema
 from .workload_generator import WorkloadGenerator
 
+class DummyWorkloadGenerator:
+    """A simple, pickle-friendly class to hold pre-generated workloads."""
+    def __init__(self, training, validation, testing, query_texts, columns, number_of_query_classes):
+        self.wl_training = training
+        self.wl_validation = validation
+        self.wl_testing = testing
+        self.query_texts = query_texts
+        self.globally_indexable_columns = columns
+        self.number_of_query_classes = number_of_query_classes
+
+
 class Experiment(object):
     def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0):
         """
@@ -32,6 +43,7 @@ class Experiment(object):
 
         cp = ConfigurationParser(configuration_file)
         self.config = cp.config
+        self.fix_index_count = fix_index_count
         if uni_freq:
             self.config['workload']['varying_frequencies'] = False
         if fix_index_count:
@@ -123,16 +135,41 @@ class Experiment(object):
             self.config["column_filters"]
         )  # setup schema and reduce columns with small rows
 
-        self.workload_generator = WorkloadGenerator(
-            self.config["workload"],spath =  self.config["workload"]["path"],
-            workload_columns=self.schema.columns,
-            random_seed=self.config["random_seed"],
-            database_name=self.schema.database_name,
-            experiment_id=self.id,
-            filter_utilized_columns=self.config["filter_utilized_columns"],experiment_folder_path =self.experiment_folder_path
-        )
+        if self.config.get("load_workloads_from_file"):
+            with open(self.config["load_workloads_from_file"], "rb") as f:
+                chunk_workloads = pickle.load(f)
+
+            query_texts = [[q.text] for q in chunk_workloads[0].queries]
+            self.workload_generator = DummyWorkloadGenerator(
+                training=chunk_workloads[:20],
+                validation=[chunk_workloads[20:40]],
+                testing=[chunk_workloads[20:40]],
+                query_texts=query_texts,
+                columns=self.schema.columns,
+                number_of_query_classes=len(query_texts)
+            )
+            logging.info(f"Loaded workloads from {self.config['load_workloads_from_file']}")
+        else:
+            self.workload_generator = WorkloadGenerator(
+                self.config["workload"],spath =  self.config["workload"]["path"],
+                workload_columns=self.schema.columns,
+                random_seed=self.config["random_seed"],
+                database_name=self.schema.database_name,
+                experiment_id=self.id,
+                filter_utilized_columns=self.config["filter_utilized_columns"],experiment_folder_path =self.experiment_folder_path
+            )
         self._assign_budgets_to_workloads()
         self._pickle_workloads()
+
+        # Check for a source model to enable policy transfer
+        if self.config.get("source_model_path"):
+            source_model = self.config["source_model_path"]
+            if os.path.exists(source_model):
+                self.model_pool.append(source_model)
+                logging.info(f"Added source model for policy transfer: {source_model}")
+            else:
+                logging.warning(f"Source model not found at: {source_model}")
+
 
         self.globally_indexable_columns = self.workload_generator.globally_indexable_columns
 
@@ -156,7 +193,7 @@ class Experiment(object):
             workload_embedder_connector = PostgresDatabaseConnector(self.schema.database_name, autocommit=True)
             self.workload_embedder = workload_embedder_class(
                 self.workload_generator.query_texts,
-                40, # 40 = representation size(50) - value size(10)
+                35, # 40 = representation size(50) - value size(10)
                 workload_embedder_connector,
                 self.globally_indexable_columns,
             )
@@ -194,7 +231,7 @@ class Experiment(object):
 
         with open(f"{self.experiment_folder_path}/validation_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_validation, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        
+
         with open(f"{self.experiment_folder_path}/train_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_training, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -204,7 +241,7 @@ class Experiment(object):
         self.model.training = False
         self.model.env.norm_reward = False
         self.model.env.training = False
-        
+
         self.schema.database_name = self.config["database"]
 
         test_wl = self.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
@@ -831,7 +868,6 @@ class Experiment(object):
 
         return _init
 
- 
 
     def _set_sb_version_specific_methods(self):
         if self.config["rl_algorithm"]["stable_baselines_version"] == 2:
