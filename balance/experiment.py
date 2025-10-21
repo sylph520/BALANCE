@@ -32,9 +32,8 @@ class DummyWorkloadGenerator:
         self.globally_indexable_columns = columns
         self.number_of_query_classes = number_of_query_classes
 
-
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0):
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0, lsi_dimension=None):
         """
         setup the experiment from configuration, random seed, and related method info
         """
@@ -56,6 +55,8 @@ class Experiment(object):
             self.config["workload"]["unknown_queries"] = int(aa)
         if id!=None:
             self.config["id"] = id
+        if lsi_dimension:
+            self.config["workload_embedder"]["representation_size"] = lsi_dimension
         self._set_sb_version_specific_methods()
 
         self.id = self.config["id"]
@@ -138,7 +139,7 @@ class Experiment(object):
         if self.config.get("load_workloads_from_file"):
             with open(self.config["load_workloads_from_file"], "rb") as f:
                 chunk_workloads = pickle.load(f)
-
+            
             query_texts = [[q.text] for q in chunk_workloads[0].queries]
             self.workload_generator = DummyWorkloadGenerator(
                 training=chunk_workloads[:20],
@@ -161,15 +162,18 @@ class Experiment(object):
         self._assign_budgets_to_workloads()
         self._pickle_workloads()
 
-        # Check for a source model to enable policy transfer
-        if self.config.get("source_model_path"):
-            source_model = self.config["source_model_path"]
-            if os.path.exists(source_model):
-                self.model_pool.append(source_model)
-                logging.info(f"Added source model for policy transfer: {source_model}")
+        # Check for source models to enable policy transfer
+        if self.config.get("source_model_paths"):
+            source_models = self.config["source_model_paths"]
+            if isinstance(source_models, list):
+                for model_path in source_models:
+                    if os.path.exists(model_path):
+                        self.model_pool.append(model_path)
+                        logging.info(f"Added source model for policy transfer: {model_path}")
+                    else:
+                        logging.warning(f"Source model not found at: {model_path}")
             else:
-                logging.warning(f"Source model not found at: {source_model}")
-
+                logging.warning("`source_model_paths` should be a list.")
 
         self.globally_indexable_columns = self.workload_generator.globally_indexable_columns
 
@@ -193,7 +197,7 @@ class Experiment(object):
             workload_embedder_connector = PostgresDatabaseConnector(self.schema.database_name, autocommit=True)
             self.workload_embedder = workload_embedder_class(
                 self.workload_generator.query_texts,
-                35, # 40 = representation size(50) - value size(10)
+                self.config["workload_embedder"]["representation_size"], # 40 = representation size(50) - value size(10)
                 workload_embedder_connector,
                 self.globally_indexable_columns,
             )
@@ -231,7 +235,7 @@ class Experiment(object):
 
         with open(f"{self.experiment_folder_path}/validation_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_validation, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
+        
         with open(f"{self.experiment_folder_path}/train_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_training, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -241,7 +245,7 @@ class Experiment(object):
         self.model.training = False
         self.model.env.norm_reward = False
         self.model.env.training = False
-
+        
         self.schema.database_name = self.config["database"]
 
         test_wl = self.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
@@ -868,6 +872,7 @@ class Experiment(object):
 
         return _init
 
+ 
 
     def _set_sb_version_specific_methods(self):
         if self.config["rl_algorithm"]["stable_baselines_version"] == 2:
@@ -898,5 +903,3 @@ class Experiment(object):
             self.sync_envs_normalization = sync_envs_normalization_sb3
         else:
             raise ValueError("There are only versions 2 and 3 of StableBaselines.")
-
-

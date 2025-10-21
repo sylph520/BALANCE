@@ -20,7 +20,7 @@ random.seed(0)
 use_gpu = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = use_gpu
 
-def run_single_experiment(configuration_file, test_only_args=None):
+def run_single_experiment(configuration_file, test_only_args=None, lsi_dimension=None):
     # If test_only_args is provided, simulate the command-line arguments for test_only mode
     if test_only_args:
         args = argparse.Namespace(

@@ -18,7 +18,7 @@
   "result_path": "experiment_results",
   "workload_embedder": {
     "type": "PlanEmbedderLSIBOW",
-    "representation_size": 45
+    "representation_size": 30
   },
   "rl_algorithm": {
     "algorithm": "PPO2",

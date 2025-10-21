@@ -9,23 +9,23 @@ def segment_workloads(workload_stream, difference_threshold_x):
     Segments a stream of workloads into chunks based on template differences.
 
     Args:
-        workload_stream (list of sets): A list where each element is a set of
+        workload_stream (list of sets): A list where each element is a set of 
                                         query template IDs for that workload.
         difference_threshold_x (int): The X% threshold. If the percentage of new
                                       templates in an incoming workload is less
                                       than this, it's merged.
 
     Returns:
-        list of lists: A list of chunks, where each chunk is a list of workloads.
+        list of lists: A list of chunks, where each chunk is a list of indices to the original stream.
     """
     if not workload_stream:
         return []
 
     chunks = []
     # Start the first chunk with the first workload
-    current_chunk_workloads = [workload_stream[0]]
     current_chunk_templates = set(workload_stream[0])
-
+    start_index = 0
+    
     logging.info(f"Starting Chunk 1 with workload: {workload_stream[0]}")
 
     # Iterate over the rest of the workloads
@@ -35,15 +35,14 @@ def segment_workloads(workload_stream, difference_threshold_x):
 
         if not next_workload_templates:
             logging.warning(f"Workload {workload_number} is empty, merging into current chunk.")
-            current_chunk_workloads.append(next_workload_templates)
             continue
 
         # Calculate the set of new templates in the incoming workload
         new_templates = next_workload_templates - current_chunk_templates
-
+        
         # Calculate the difference percentage
         diff_percent = (len(new_templates) / len(next_workload_templates)) * 100
-
+        
         logging.info(f"Templates in current chunk: {current_chunk_templates}")
         logging.info(f"New templates in workload {workload_number}: {new_templates}")
         logging.info(f"Difference percentage: {diff_percent:.2f}%")
@@ -51,24 +50,22 @@ def segment_workloads(workload_stream, difference_threshold_x):
         if diff_percent < difference_threshold_x:
             # Merge into the current chunk
             logging.info(f"Difference is less than {difference_threshold_x}%. Merging into current chunk.")
-            current_chunk_workloads.append(next_workload_templates)
             current_chunk_templates.update(next_workload_templates)
         else:
             # Difference is too high, start a new chunk
             logging.info(f"Difference is >= {difference_threshold_x}%. Finalizing current chunk and starting a new one.")
-            chunks.append(current_chunk_workloads)
-
+            chunks.append(list(range(start_index, i + 1)))
+            start_index = i + 1
+            
             # Start the new chunk
-            current_chunk_workloads = [next_workload_templates]
             current_chunk_templates = set(next_workload_templates)
             logging.info(f"Starting Chunk {len(chunks) + 1} with workload: {next_workload_templates}")
 
     # Add the last chunk to the list of chunks
-    chunks.append(current_chunk_workloads)
+    chunks.append(list(range(start_index, len(workload_stream))))
     logging.info("--- Stream finished. Finalizing the last chunk. ---")
 
     return chunks
-
 if __name__ == "__main__":
     print("##### TEST SCENARIO: 4 Identical Static Workloads #####")
     # Define the scenario: 4 identical workloads arriving one by one.
