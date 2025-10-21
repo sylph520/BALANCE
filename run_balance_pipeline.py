@@ -3,8 +3,9 @@ import logging
 import os
 import pickle
 import copy
+import argparse
 from main import run_single_experiment
-from balance.workload_stream_generator import generate_workload_stream, read_tpch_queries, TOTAL_TEMPLATES
+from balance.workload_stream_generator import generate_workload_stream, read_queries
 from balance.chunk_segmenter import segment_workloads
 from index_selection_evaluation.selection.workload import Workload, Query
 from balance.schema import Schema
@@ -23,14 +24,18 @@ def convert_dict_to_workload(workload_dict, workload_generator):
 
 def main():
     logging.info("##### Starting BALANCE Pipeline: Segmentation and Policy Transfer #####")
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--bm', type=str, default='tpch')
+    args = parser.parse_args()
+    benchmark = args.bm
     # --- Step 1: Generate a continuous stream of workloads ---
     logging.info("--- Step 1: Generating a continuous workload stream ---")
-    TOTAL_TEMPLATES.update(read_tpch_queries())
-    base_templates = {k: TOTAL_TEMPLATES[k] for k in list(TOTAL_TEMPLATES.keys())[:14]}
+    total_templates = {}
+    total_templates.update(read_queries(benchmark))
+    base_templates = {k: total_templates[k] for k in list(total_templates.keys())[:14]}
 
     # Generate 4 varied sets of 300 workloads each
-    stream_of_chunks_dicts = generate_workload_stream(base_templates, num_chunks=4, variation_type='query')
+    stream_of_chunks_dicts = generate_workload_stream(total_templates, base_templates, num_chunks=4, variation_type='query')
 
     # Flatten the stream and prepare for segmentation
     flat_workload_stream_dicts = [wl for chunk in stream_of_chunks_dicts for wl in chunk]

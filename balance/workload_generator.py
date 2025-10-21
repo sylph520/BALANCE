@@ -374,15 +374,13 @@ class WorkloadGenerator(object):
                 test_instances = 1
                 break
 
-        if self.varying_frequencies:
-            unique_workload_tuples = unique_workload_tuples - set(validation_tuples)
-            unique_workload_tuples = unique_workload_tuples - set(test_workload_tuples)
-
         validation_tuples = self.rnd.sample(unique_workload_tuples, validation_instances)
         test_workload_tuples = self.rnd.sample(unique_workload_tuples, test_instances)
 
         if self.varying_frequencies:
-            assert len(unique_workload_tuples) == train_instances
+            unique_workload_tuples = unique_workload_tuples - set(validation_tuples)
+            unique_workload_tuples = unique_workload_tuples - set(test_workload_tuples)
+
         train_workload_tuples = unique_workload_tuples
 
         if self.varying_frequencies:

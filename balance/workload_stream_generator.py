@@ -1,26 +1,27 @@
+import os
 import random
 import copy
 import json
 import logging
 import argparse
+from typing import Dict, List
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-# Constants for TPCH
-QUERY_PATH = "query_files/TPCHC"
-TOTAL_TEMPLATES = {}
 
-def read_tpch_queries():
+def read_queries(bm: str) -> Dict[str, List[str]]:
     """Reads all TPCH query templates from their files."""
+    query_path = f"query_files/{bm.upper()}"
     templates = {}
-    for i in range(1, 23):
-        try:
-            with open(f"{QUERY_PATH}/TPCHC_{i}.txt", 'r') as f:
-                # Read the first line and strip any whitespace
-                templates[i] = f.readline().strip()
-        except FileNotFoundError:
-            logging.warning(f"Could not find query file for TPCHC_{i}.txt. Skipping.")
+    for i in os.listdir(query_path):
+        if i.endswith('.txt'):
+            tpl_id = i.split('.')[0].split('_')[-1]
+            with open(os.path.join(query_path, i), 'r') as f:
+                q_list = f.readlines()
+            if q_list[-1] == '':
+                q_list.pop()
+            templates[tpl_id] = q_list
     return templates
 
 QUERIES_PER_WORKLOAD = 14
@@ -35,11 +36,14 @@ def generate_workload_chunk(templates, num_workloads, vary_frequency=True):
         selected_templates = random.sample(template_items, QUERIES_PER_WORKLOAD)
         for template_id, query_text in selected_templates:
             frequency = random.randint(1, 10000) if vary_frequency else 1
-            workload[query_text] = frequency
+            try:
+                workload[query_text] = frequency
+            except:
+                raise ValueError(query_text)
         chunk.append(workload)
     return chunk
 
-def create_varied_chunk(source_templates, unused_templates, variation_type, substitution_rate):
+def create_varied_chunk(total_templates, source_templates, unused_templates, variation_type, substitution_rate):
     """Creates a new set of templates by varying a source set."""
     next_templates = copy.deepcopy(source_templates)
     vary_freq_for_new_chunk = True
@@ -55,13 +59,13 @@ def create_varied_chunk(source_templates, unused_templates, variation_type, subs
         for tid in templates_to_remove_ids:
             del next_templates[tid]
         for tid in templates_to_add_ids:
-            next_templates[tid] = TOTAL_TEMPLATES[tid]
+            next_templates[tid] = random.choice(total_templates[tid])
 
         # Update the pool of unused templates as well
         for tid in templates_to_add_ids:
             del unused_templates[tid]
         for tid in templates_to_remove_ids:
-            unused_templates[tid] = TOTAL_TEMPLATES[tid]
+            unused_templates[tid] = random.choice(total_templates[tid])
 
         logging.info(f"Substituted {num_to_substitute} templates. New template pool: {sorted(list(next_templates.keys()))}")
     elif variation_type == 'frequency':
@@ -70,14 +74,15 @@ def create_varied_chunk(source_templates, unused_templates, variation_type, subs
 
     return next_templates, unused_templates, vary_freq_for_new_chunk
 
-def generate_workload_stream(base_templates, num_chunks, variation_type='query', substitution_rate=0.3):
+def generate_workload_stream(total_templates, base_templates, num_chunks, variation_type='query', substitution_rate=0.3):
     """Generates a stream of workload chunks with controlled variation."""
     if len(base_templates) < QUERIES_PER_WORKLOAD:
         raise ValueError(f"base_templates must contain at least {QUERIES_PER_WORKLOAD} templates.")
 
     stream = []
-    current_templates = copy.deepcopy(base_templates)
-    unused_templates = {k: v for k, v in TOTAL_TEMPLATES.items() if k not in current_templates}
+    current_templates = {k: random.choice(v) for k, v in base_templates.items()}
+    unused_templates = {k: random.choice(v) for k, v in total_templates.items() if k not in current_templates}
+    # __import__('ipdb').set_trace()
 
     # 1. Create the first, base chunk
     logging.info(f"Generating Base Chunk 1 with templates: {sorted(list(current_templates.keys()))}")
@@ -90,7 +95,7 @@ def generate_workload_stream(base_templates, num_chunks, variation_type='query',
         logging.info(f"--- Generating Varied Chunk {chunk_num} (Variation: {variation_type}) ---")
 
         next_templates, unused_templates, vary_freq = create_varied_chunk(
-            current_templates, unused_templates, variation_type, substitution_rate
+            total_templates, current_templates, unused_templates, variation_type, substitution_rate
         )
 
         new_chunk = generate_workload_chunk(next_templates, WORKLOADS_PER_CHUNK, vary_frequency=vary_freq)
@@ -101,13 +106,14 @@ def generate_workload_stream(base_templates, num_chunks, variation_type='query',
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generate a stream of workload chunks with specified variation.")
-    parser.add_argument("--variation_type", type=str, required=True, choices=['query', 'frequency', 'combined'],
-                        help="The type of variation between workload chunks.")
+    parser.add_argument('--bm', type=str, default='tpch')
+    parser.add_argument("--variation_type", type=str, choices=['query', 'frequency', 'combined'],
+                        help="The type of variation between workload chunks.", default='query')
     args = parser.parse_args()
 
     # Load the actual TPCH query templates
-    TOTAL_TEMPLATES = read_tpch_queries()
-    if not TOTAL_TEMPLATES:
+    total_templates = read_queries(args.bm)
+    if not total_templates:
         logging.error("No TPCH query templates could be loaded. Exiting.")
         exit(1)
 
@@ -116,19 +122,19 @@ if __name__ == '__main__':
     BASE_TEMPLATE_POOL_SIZE = 14
 
     # Randomly select a pool of templates for the first chunk
-    if BASE_TEMPLATE_POOL_SIZE > len(TOTAL_TEMPLATES):
+    if BASE_TEMPLATE_POOL_SIZE > len(total_templates):
         raise ValueError("Pool size cannot be larger than total available templates.")
 
     # Seed for reproducibility
     random.seed(42)
     # Get the template IDs to sample from
-    available_template_ids = list(TOTAL_TEMPLATES.keys())
+    available_template_ids = list(total_templates.keys())
     base_template_ids = random.sample(available_template_ids, BASE_TEMPLATE_POOL_SIZE)
-    base_template_pool = {tid: TOTAL_TEMPLATES[tid] for tid in base_template_ids}
+    base_template_pool = {tid: total_templates[tid] for tid in base_template_ids}
 
     # Generate the stream based on the specified variation type
     logging.info(f"\n##### GENERATING STREAM: '{args.variation_type.upper()}' VARIATION #####")
-    workload_stream = generate_workload_stream(base_template_pool, NUM_CHUNKS, variation_type=args.variation_type)
+    workload_stream = generate_workload_stream(total_templates, base_template_pool, NUM_CHUNKS, variation_type=args.variation_type)
 
     output_filename = f'workload_stream_{args.variation_type}_variation.json'
     with open(output_filename, 'w') as f:
@@ -142,15 +148,16 @@ if __name__ == '__main__':
 
     # Create a source pool of templates
     source_pool_ids = base_template_ids
-    source_pool_templates = {tid: TOTAL_TEMPLATES[tid] for tid in source_pool_ids}
+    source_pool_templates = {tid: total_templates[tid] for tid in source_pool_ids}
 
     # Create a pool of templates that are not in the source pool
-    initial_unused_templates = {k: v for k, v in TOTAL_TEMPLATES.items() if k not in source_pool_templates}
+    initial_unused_templates = {k: v for k, v in total_templates.items() if k not in source_pool_templates}
 
     print(f"Source Pool IDs: {sorted(source_pool_ids)}")
 
     # Call the function to create a new, varied chunk
     varied_templates, _, _ = create_varied_chunk(
+        total_templates = total_templates,
         source_templates=source_pool_templates,
         unused_templates=initial_unused_templates,
         variation_type='query',
