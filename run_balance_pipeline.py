@@ -5,7 +5,7 @@ import pickle
 import copy
 import argparse
 from main import run_single_experiment
-from balance.workload_stream_generator import generate_workload_stream, read_queries
+from balance.workload_stream_generator import generate_workload_chunk_stream, read_queries
 from balance.chunk_segmenter import segment_workloads
 from index_selection_evaluation.selection.workload import Workload, Query
 from balance.schema import Schema
@@ -22,11 +22,16 @@ def convert_dict_to_workload(workload_dict, workload_generator):
         queries.append(query)
     return Workload(queries)
 
+
 def main():
     logging.info("##### Starting BALANCE Pipeline: Segmentation and Policy Transfer #####")
     parser = argparse.ArgumentParser()
     parser.add_argument('--bm', type=str, default='tpch')
+    parser.add_argument('--mode', type=str, default='batch')
+    parser.add_argument('--ws_file', type=str, default='')
+    parser.add_argument('--wk_size', type=int, default=14)
     args = parser.parse_args()
+
     benchmark = args.bm
     # --- Step 1: Generate a continuous stream of workloads ---
     logging.info("--- Step 1: Generating a continuous workload stream ---")
@@ -35,10 +40,40 @@ def main():
     base_templates = {k: total_templates[k] for k in list(total_templates.keys())[:14]}
 
     # Generate 4 varied sets of 300 workloads each
-    stream_of_chunks_dicts = generate_workload_stream(total_templates, base_templates, num_chunks=4, variation_type='query')
+    __import__('ipdb').set_trace()
+    if args.mode == 'batch':  # -> List[Dict[str, int]]
+        # obtain workloads (List[str]) sperated by chunks, List[List[Dict[str, int]]]
+        stream_of_chunks_dicts = generate_workload_chunk_stream(total_templates, base_templates, num_chunks=4, variation_type='query')
+        # Flatten the stream and prepare for segmentation
+        flat_workload_stream_dicts = [wl for chunk in stream_of_chunks_dicts for wl in chunk]
 
-    # Flatten the stream and prepare for segmentation
-    flat_workload_stream_dicts = [wl for chunk in stream_of_chunks_dicts for wl in chunk]
+        # flat_workload_stream_dicts_new = []
+        # for w in flat_workload_stream_dicts:
+        #     tmp = {q: 1 for q in w}
+        #     flat_workload_stream_dicts_new.append(tmp)
+        # flat_workload_stream_dicts = flat_workload_stream_dicts_new
+
+        # flat_sqls = [q for w in flat_workload_stream_dicts for q in w]
+        # with open('tmp.sql', 'w') as f:
+        #     f.write(''.join(flat_sqls))
+    else:
+        ws_file = args.ws_file
+        wk_size = args.wk_size
+        if 'pkl' in ws_file:
+            with open(ws_file, 'rb') as f:
+                flat_workload_stream_dicts = pickle.load(f)
+        elif 'txt' in ws_file or 'sql' in ws_file:
+            with open(ws_file, 'r') as f:
+                sqls = f.readlines()
+            if sqls[-1] == '':
+                sqls.pop()
+            num_wks = len(sqls) // wk_size
+            flat_workload_stream_dicts = [{k: 1 for k in sqls[i*wk_size:(i+1)*wk_size]} for i in range(num_wks)]
+
+    # with open(f'{args.mode}.tmp', 'wb') as f:
+    #     pickle.dump(flat_workload_stream_dicts, f)
+    # os._exit(0)
+
     # We need the template IDs (the query text) for the segmentation logic
     workload_stream_for_segmentation = [set(wl.keys()) for wl in flat_workload_stream_dicts]
     logging.info(f"Successfully generated a flat stream of {len(workload_stream_for_segmentation)} workloads.")

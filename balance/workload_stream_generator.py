@@ -70,11 +70,11 @@ def create_varied_chunk(total_templates, source_templates, unused_templates, var
         logging.info(f"Substituted {num_to_substitute} templates. New template pool: {sorted(list(next_templates.keys()))}")
     elif variation_type == 'frequency':
         vary_freq_for_new_chunk = False
-        logging.info(f"Using same templates as previous chunk, but with fixed frequencies.")
+        logging.info("Using same templates as previous chunk, but with fixed frequencies.")
 
     return next_templates, unused_templates, vary_freq_for_new_chunk
 
-def generate_workload_stream(total_templates, base_templates, num_chunks, variation_type='query', substitution_rate=0.3):
+def generate_workload_chunk_stream(total_templates, base_templates, num_chunks, variation_type='query', substitution_rate=0.3):
     """Generates a stream of workload chunks with controlled variation."""
     if len(base_templates) < QUERIES_PER_WORKLOAD:
         raise ValueError(f"base_templates must contain at least {QUERIES_PER_WORKLOAD} templates.")
@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
     # Generate the stream based on the specified variation type
     logging.info(f"\n##### GENERATING STREAM: '{args.variation_type.upper()}' VARIATION #####")
-    workload_stream = generate_workload_stream(total_templates, base_template_pool, NUM_CHUNKS, variation_type=args.variation_type)
+    workload_stream = generate_workload_chunk_stream(total_templates, base_template_pool, NUM_CHUNKS, variation_type=args.variation_type)
 
     output_filename = f'workload_stream_{args.variation_type}_variation.json'
     with open(output_filename, 'w') as f:
