@@ -144,7 +144,7 @@ class TableGenerator:
             self.directory = "./index_selection_evaluation/tpch-kit/dbgen"
             self.create_table_statements_file = "dss.ddl"
             self.cmd = ["./dbgen", "-s", str(self.scale_factor), "-f"]
-        elif self.benchmark_name == "tpcds":
+        elif self.benchmark_name in ["tpcds", "tpcdsc"]:
             self.make_command = ["make"]
             if platform.system() == "Darwin":
                 self.make_command.append("OS=MACOS")
@@ -159,6 +159,6 @@ class TableGenerator:
                 and self.scale_factor != 0.001
             ):
                 raise Exception("Wrong TPCDS scale factor")
-        
+
         else:
             raise NotImplementedError("only tpch/ds implemented.")

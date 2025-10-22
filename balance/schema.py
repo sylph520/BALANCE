@@ -23,7 +23,7 @@ class Schema(object):
             for column in table.columns:
                 self.columns.append(column)
 
-        if 'tpchc' not in benchmark_name.lower():
+        if 'tpchc' not in benchmark_name.lower() or 'tpcdsc' not in benchmark_name.lower():
             for filter_name in filters.keys():  # e.g., TableNumRowsFilter
                 filter_class = getattr(importlib.import_module("balance.schema"), filter_name)
                 filter_instance = filter_class(filters[filter_name], self.database_name)

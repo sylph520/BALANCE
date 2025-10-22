@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--mode', type=str, default='batch')
     parser.add_argument('--ws_file', type=str, default='')
     parser.add_argument('--wk_size', type=int, default=14)
+    parser.add_argument('--ts', type=int, default=0)
     args = parser.parse_args()
 
     benchmark = args.bm
@@ -108,6 +109,10 @@ def main():
 
     with open(base_config_path, 'r') as f:
         base_config = json.load(f)
+
+    if args.ts:
+        base_config['timesteps'] = args.ts
+
     schema = Schema(base_config["workload"]["benchmark"], base_config["workload"]["scale_factor"], base_config["database"], base_config["column_filters"])
     parsing_workload_generator = WorkloadGenerator(base_config["workload"], spath=base_config["workload"]["path"], workload_columns=schema.columns, random_seed=0, database_name="", experiment_id="")
 
