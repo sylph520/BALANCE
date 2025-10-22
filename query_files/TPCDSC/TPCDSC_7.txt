@@ -1,0 +1,1 @@
+select ws_ext_ship_cost from web_sales, store_sales where ws_item_sk=ss_item_sk and store_sales.ss_ticket_number = 119333 and web_sales.ws_ext_tax > 0.00;

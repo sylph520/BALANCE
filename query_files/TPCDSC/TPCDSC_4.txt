@@ -1,0 +1,1 @@
+select ss_addr_sk from item, store_sales where i_item_sk=ss_item_sk and store_sales.ss_sales_price > 3.19 and item.i_container = 'Unknown   ';

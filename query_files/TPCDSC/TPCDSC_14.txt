@@ -1,0 +1,1 @@
+select cs_ext_discount_amt from catalog_sales, date_dim where d_date_sk=cs_sold_date_sk and date_dim.d_day_name = 'Tuesday  ' and catalog_sales.cs_net_paid_inc_ship > 1156.44;

@@ -1,0 +1,1 @@
+select ss_sales_price from web_sales, store_sales where ws_item_sk=ss_item_sk and store_sales.ss_ext_sales_price < 470.64 and web_sales.ws_ext_sales_price = 4853.80;

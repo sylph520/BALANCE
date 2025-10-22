@@ -1,0 +1,1 @@
+select cs_ext_list_price from catalog_sales, inventory where cs_item_sk=inv_item_sk and catalog_sales.cs_coupon_amt = 212.97 and catalog_sales.cs_bill_customer_sk = 90140;

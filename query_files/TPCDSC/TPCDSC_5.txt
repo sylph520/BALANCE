@@ -1,0 +1,1 @@
+select sr_return_time_sk from store_returns, store_sales where ss_item_sk=sr_item_sk and store_sales.ss_sales_price > 7.05 and store_sales.ss_ext_discount_amt < 0.00;

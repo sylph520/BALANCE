@@ -1,0 +1,1 @@
+select sr_return_quantity from store_returns, store_sales where sr_ticket_number=ss_ticket_number and store_returns.sr_returned_date_sk > 2451326 and store_returns.sr_reason_sk < 32;

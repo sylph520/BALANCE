@@ -1,0 +1,1 @@
+select cs_warehouse_sk from promotion, catalog_sales where cs_promo_sk=p_promo_sk and promotion.p_channel_dmail = 'N' and catalog_sales.cs_quantity > 55;

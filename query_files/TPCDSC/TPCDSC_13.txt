@@ -1,0 +1,1 @@
+select ws_ext_discount_amt from web_sales, date_dim where d_date_sk=ws_sold_date_sk and web_sales.ws_ship_cdemo_sk = 1101255 and web_sales.ws_web_site_sk > 13;

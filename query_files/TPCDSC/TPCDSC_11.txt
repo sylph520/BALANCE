@@ -1,0 +1,1 @@
+select ss_sales_price from store_returns, store_sales where sr_item_sk=ss_item_sk and store_returns.sr_return_ship_cost = 2914.00 and store_sales.ss_list_price > 89.10;

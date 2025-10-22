@@ -1,0 +1,1 @@
+select ws_ext_ship_cost from web_sales, web_returns where wr_order_number=ws_order_number and web_sales.ws_bill_addr_sk > 45614 and web_returns.wr_returning_addr_sk > 15553;

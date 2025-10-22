@@ -1,0 +1,1 @@
+select cr_warehouse_sk from catalog_returns, catalog_sales where cr_order_number=cs_order_number and catalog_sales.cs_ship_hdemo_sk < 5324 and catalog_sales.cs_list_price = 37.36;

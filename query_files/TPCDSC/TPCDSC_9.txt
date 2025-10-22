@@ -1,0 +1,1 @@
+select cs_ship_date_sk from promotion, catalog_sales where cs_promo_sk=p_promo_sk and promotion.p_item_sk < 5038 and catalog_sales.cs_item_sk = 17637;

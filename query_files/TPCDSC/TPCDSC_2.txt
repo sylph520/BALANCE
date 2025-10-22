@@ -1,0 +1,1 @@
+select ws_order_number from web_sales, date_dim where d_date_sk=ws_sold_date_sk and web_sales.ws_list_price < 94.77 and web_sales.ws_wholesale_cost > 9.52;

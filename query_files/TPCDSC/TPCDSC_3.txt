@@ -1,0 +1,1 @@
+select ss_net_profit from store_returns, store_sales where ss_ticket_number=sr_ticket_number and store_sales.ss_promo_sk < 224 and store_returns.sr_fee > 93.35;

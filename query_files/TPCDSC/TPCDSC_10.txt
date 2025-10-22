@@ -1,0 +1,1 @@
+select cs_coupon_amt from item, catalog_sales where i_item_sk=cs_item_sk and catalog_sales.cs_ship_hdemo_sk = 2881 and catalog_sales.cs_ext_sales_price = 112.00;

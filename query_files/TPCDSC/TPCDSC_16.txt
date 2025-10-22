@@ -1,0 +1,1 @@
+select cs_order_number from catalog_sales, date_dim where d_date_sk=cs_sold_date_sk and date_dim.d_current_day = 'N' and date_dim.d_fy_week_seq < 10082;

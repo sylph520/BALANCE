@@ -1,0 +1,1 @@
+select ws_ext_list_price from web_sales, web_returns where wr_order_number=ws_order_number and web_sales.ws_ext_sales_price > 5017.35 and web_sales.ws_warehouse_sk > 5;

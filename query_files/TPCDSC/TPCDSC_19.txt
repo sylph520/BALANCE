@@ -1,0 +1,1 @@
+select inv_item_sk from warehouse, inventory where w_warehouse_sk=inv_warehouse_sk and inventory.inv_item_sk < 13106 and warehouse.w_street_name = 'Wilson Elm';

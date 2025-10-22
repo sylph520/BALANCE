@@ -1,0 +1,1 @@
+select d_current_year from catalog_sales, date_dim where d_date_sk=cs_sold_date_sk and catalog_sales.cs_ship_mode_sk = 15 and catalog_sales.cs_ship_addr_sk > 4672;
