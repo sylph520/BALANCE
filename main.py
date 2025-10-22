@@ -20,41 +20,12 @@ random.seed(0)
 use_gpu = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = use_gpu
 
-def run_single_experiment(configuration_file, test_only_args=None, lsi_dimension=None):
-    # If test_only_args is provided, simulate the command-line arguments for test_only mode
-    if test_only_args:
-        args = argparse.Namespace(
-            config=configuration_file,
-            test_only=True,
-            uni_freq=test_only_args.get('uni_freq', False),
-            fix_index_count=test_only_args.get('fix_index_count', 0),
-            ts=test_only_args.get('ts', 0),
-            test_workload=test_only_args.get('test_workload'),
-            test_workload_qids=test_only_args.get('test_workload_qids')
-        )
-    else:
-        # This part is now less relevant if called from pipeline, but kept for standalone execution
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--wk_type', type=str, default='tpch')
-        parser.add_argument('--config', type=str, default=configuration_file, help='Path to configuration file (overrides wk_type)')
-        parser.add_argument('--ts', type=int, help='the number of time steps to train', default=0)
-        parser.add_argument('--load_model', type=str, help='Path to saved model to test instead of training')
-        parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
-        parser.add_argument('--uni_freq', action='store_true', default=False)
-        parser.add_argument('--fix_index_count', type=int, default=0)
-        parser.add_argument('--test_workload', type=str, help='Path to a .sql file to use as a custom test workload.')
-        parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
-        # In a direct call, we can't parse args, so we use the passed config file
-        # This is a simplification for in-process calls.
-        known_args, _ = parser.parse_known_args()
-        args = known_args
-        args.config = configuration_file
-
-    CONFIGURATION_FILE = args.config
+def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0, test_workload='', test_workload_qids=''):
+    CONFIGURATION_FILE = configuration_file
 
     logging.warning("use gpu:" + use_gpu)
-    if args.test_only:
-        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count, ts=args.ts)
+    if test_only:
+        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts)
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
@@ -76,24 +47,24 @@ def run_single_experiment(configuration_file, test_only_args=None, lsi_dimension
 
                 model = experiment.model_type.load(model_path)
 
-                if args.test_workload:
-                    logging.info(f"Using custom test workload from file: {args.test_workload}")
+                if test_workload:
+                    logging.info(f"Using custom test workload from file: {test_workload}")
                     query_ids = None
-                    if args.test_workload_qids:
+                    if test_workload_qids:
                         try:
-                            query_ids = [int(qid.strip()) for qid in args.test_workload_qids.split(',')]
+                            query_ids = [int(qid.strip()) for qid in test_workload_qids.split(',')]
                         except ValueError:
                             logging.error("Invalid format for --test_workload_qids. Please provide a comma-separated list of integers.")
                             exit(1)
-                    test_wl = experiment.workload_from_sql_file(args.test_workload, selection_qids=query_ids)
-                    if args.fix_index_count > 0:
-                        test_wl.budget = args.fix_index_count
+                    test_wl = experiment.workload_from_sql_file(test_workload, selection_qids=query_ids)
+                    if fix_index_count > 0:
+                        test_wl.budget = fix_index_count
                     test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
                 else:
                     custom_wl = True
                     if custom_wl:
                         logging.info("Using custom hardcoded test workload.")
-                        if not args.uni_freq:
+                        if not uni_freq:
                             test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
                         else:
                             test_wl = experiment.workload_generator._workloads_from_tuples([tuple(([20, 5, 17, 2, 4, 19, 3, 1, 10, 16, 15, 11, 12, 13, 18, 6, 14, 7, 9, 8], [1]*20))])[0]
@@ -133,14 +104,19 @@ def run_single_experiment(configuration_file, test_only_args=None, lsi_dimension
         else:
             logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
     else:
-        experiment = Experiment(CONFIGURATION_FILE, uni_freq=args.uni_freq, fix_index_count=args.fix_index_count, ts=args.ts)
+        experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts)
 
     if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
         from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
         from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
         from stable_baselines.ppo2 import ppo2, ppo2_BALANCE
-        algorithm_class = ppo2.PPO2
         source_algorithm_class = ppo2.PPO2
+        if experiment.config['rl_algorithm']['algorithm'] == 'PPO2':
+            algorithm_class = ppo2.PPO2
+        elif experiment.config['rl_algorithm']['algorithm'] == 'ppo2_BALANCE':
+            algorithm_class = ppo2_BALANCE.PPO2
+        else:
+            raise ValueError(f"unknown algorithm type {experiment.config['rl_algorithm']['algorihtm']}")
     else:
         raise ValueError
 
@@ -266,9 +242,9 @@ def run_single_experiment(configuration_file, test_only_args=None, lsi_dimension
 
     with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
         pickle.dump([training_env.venv.envs[0].dic, callbacks[0].eval_env.venv.envs[0].dic, callbacks[1].eval_env.venv.envs[0].dic], handle, protocol=pickle.HIGHEST_PROTOCOL)
-    # experiment.finishmy()
+    experiment.finishmy()
 
-    print()
+    return experiment.experiment_folder_path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -277,7 +253,7 @@ if __name__ == "__main__":
     parser.add_argument('--ts', type=int, help='the number of time steps to train', default=0)
     parser.add_argument('--load_model', type=str, help='Path to saved model to test instead of training')
     parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
-    parser.add_argument('--uni_freq', action='store_true', default=False)
+    parser.add_argument('--uni_freq', action='store_true', default=True)
     parser.add_argument('--fix_index_count', type=int, default=0)
     parser.add_argument('--test_workload', type=str, help='Path to a .sql file to use as a custom test workload.')
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
@@ -288,5 +264,7 @@ if __name__ == "__main__":
     else:
         config_file = f"experiments/{(args.wk_type).lower()}.json"
     
-    run_single_experiment(config_file, test_only_args=vars(args) if args.test_only else None)
+    run_single_experiment(config_file, test_only=args.test_only, uni_freq=args.uni_freq,\
+                            fix_index_count=args.fix_index_count, ts=args.ts,
+                            test_workload=args.test_workload, test_workload_qids = args.test_workload_qids)
 

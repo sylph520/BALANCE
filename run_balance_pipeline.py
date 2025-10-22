@@ -26,7 +26,7 @@ def convert_dict_to_workload(workload_dict, workload_generator):
 def main():
     logging.info("##### Starting BALANCE Pipeline: Segmentation and Policy Transfer #####")
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bm', type=str, default='tpch')
+    parser.add_argument('--bm', type=str, default='tpchc')
     parser.add_argument('--mode', type=str, default='batch')
     parser.add_argument('--ws_file', type=str, default='')
     parser.add_argument('--wk_size', type=int, default=14)
@@ -37,10 +37,14 @@ def main():
     logging.info("--- Step 1: Generating a continuous workload stream ---")
     total_templates = {}
     total_templates.update(read_queries(benchmark))
-    base_templates = {k: total_templates[k] for k in list(total_templates.keys())[:14]}
+    if args.mode == 'batch':
+        tpl_sample_size = 14
+    else:
+        tpl_sample_size = wk_size
+    base_templates = {k: total_templates[k] for k in list(total_templates.keys())[:tpl_sample_size]}
 
     # Generate 4 varied sets of 300 workloads each
-    __import__('ipdb').set_trace()
+    # __import__('ipdb').set_trace()
     if args.mode == 'batch':  # -> List[Dict[str, int]]
         # obtain workloads (List[str]) sperated by chunks, List[List[Dict[str, int]]]
         stream_of_chunks_dicts = generate_workload_chunk_stream(total_templates, base_templates, num_chunks=4, variation_type='query')
@@ -87,7 +91,7 @@ def main():
 
     # --- Step 3: Process chunks sequentially with policy transfer ---
     source_model_pool = []
-    base_config_path = 'experiments/tpchc_test_config.json'
+    base_config_path = f'experiments/{benchmark}_idxcount_base_config.json'
 
     with open(base_config_path, 'r') as f:
         base_config = json.load(f)
@@ -105,9 +109,12 @@ def main():
         # b. Prepare config
         config = copy.deepcopy(base_config)
         config['id'] = f"pipeline_chunk_{chunk_number}_query_var"
-        config['fix_index_count'] = config.get('fix_index_count', 0)
+        if config.get('constraint_type', 'storage') == 'count':
+            config['fix_index_count'] = config['constraint_value']
+        else:
+            config['fix_index_count'] = config.get('fix_index_count', 0)
 
-        workload_pickle_path = f"experiment_results/temp_workloads_chunk_{chunk_number}.pkl"
+        workload_pickle_path = f"experiment_results/{args.mode}/{benchmark}_workloads_chunk_{chunk_number}.pkl"
         with open(workload_pickle_path, 'wb') as f:
             pickle.dump(chunk_workloads, f)
         config['load_workloads_from_file'] = workload_pickle_path
@@ -116,24 +123,25 @@ def main():
         if source_model_pool:
             logging.info(f"Enabling policy transfer for Chunk {chunk_number} from {len(source_model_pool)} source(s).")
             config['source_model_paths'] = source_model_pool
-            config['rl_algorithm']['name'] = 'ppo2_BALANCE'
+            config['rl_algorithm']['algorithm'] = 'ppo2_BALANCE'
 
         # d. Save config and run training
-        chunk_config_path = f"experiment_results/temp_config_chunk_{chunk_number}.json"
+        chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_number}.json"
         with open(chunk_config_path, 'w') as f:
             json.dump(config, f, indent=4)
 
         logging.info(f"Starting training for Chunk {chunk_number}...")
         try:
-            run_single_experiment(chunk_config_path)
+            freq_label = 'varyFreq' if config['workload']['varying_frequencies'] else 'uniFreq'
+            res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'], uni_freq=freq_label, fix_index_count=config['fix_index_count'])
             logging.info(f"--- Training for Chunk {chunk_number} completed successfully. ---")
 
             # g. Update the source model path for the next iteration
-            freq_label = 'varyFreq' if config['workload']['varying_frequencies'] else 'uniFreq'
             exp_folder = f"experiment_results/ID_{config['id']}_{config['workload']['benchmark']}_ts{config['timesteps']}_{freq_label}"
             if config['fix_index_count'] > 0:
                 exp_folder += f"_idxmax{config['fix_index_count']}"
             new_model_path = os.path.join(exp_folder, "final_model.zip")
+            assert res_path == exp_folder
             if os.path.exists(new_model_path):
                 source_model_pool.append(new_model_path)
                 logging.info(f"Added new model to pool: {new_model_path}")

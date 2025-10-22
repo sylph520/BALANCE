@@ -136,7 +136,8 @@ class Experiment(object):
             self.config["column_filters"]
         )  # setup schema and reduce columns with small rows
 
-        if self.config.get("load_workloads_from_file"):
+        if False:
+        # if self.config.get("load_workloads_from_file"):
             with open(self.config["load_workloads_from_file"], "rb") as f:
                 chunk_workloads = pickle.load(f)
             
@@ -197,7 +198,7 @@ class Experiment(object):
             workload_embedder_connector = PostgresDatabaseConnector(self.schema.database_name, autocommit=True)
             self.workload_embedder = workload_embedder_class(
                 self.workload_generator.query_texts,
-                self.config["workload_embedder"]["representation_size"], # 40 = representation size(50) - value size(10)
+                self.config["workload_embedder"]["representation_size"] - 10, # 40 = representation size(50) - value size(10)
                 workload_embedder_connector,
                 self.globally_indexable_columns,
             )
