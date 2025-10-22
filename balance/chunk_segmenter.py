@@ -1,10 +1,10 @@
-
 import logging
+from .query_hasher import query_to_hash
 
 # Configure logging for clear output
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-def segment_workloads(workload_stream, difference_threshold_x):
+def segment_workloads(workload_stream, difference_threshold_x, hash2tid: dict):
     """
     Segments a stream of workloads into chunks based on template differences.
 
@@ -20,10 +20,18 @@ def segment_workloads(workload_stream, difference_threshold_x):
     """
     if not workload_stream:
         return []
-
+    workload_stream_ids = []
+    for i in workload_stream:
+        w_tids = set()
+        for j in i:
+            h = query_to_hash(j)
+            tid =  hash2tid[h]
+            w_tids.add(tid)
+        workload_stream_ids.append(w_tids)
+    workload_stream = workload_stream_ids
     chunks = []
     # Start the first chunk with the first workload
-    current_chunk_templates = set(workload_stream[0])
+    current_chunk_templates = set([i for i in workload_stream[0]])
     start_index = 0
     
     logging.info(f"Starting Chunk 1 with workload: {workload_stream[0]}")

@@ -10,6 +10,7 @@ from balance.chunk_segmenter import segment_workloads
 from index_selection_evaluation.selection.workload import Workload, Query
 from balance.schema import Schema
 from balance.workload_generator import WorkloadGenerator
+from balance.query_hasher import query_to_hash
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -40,11 +41,13 @@ def main():
     if args.mode == 'batch':
         tpl_sample_size = 14
     else:
-        tpl_sample_size = wk_size
+        tpl_sample_size = args.wk_size
     base_templates = {k: total_templates[k] for k in list(total_templates.keys())[:tpl_sample_size]}
 
     # Generate 4 varied sets of 300 workloads each
     # __import__('ipdb').set_trace()
+
+    hash2tid = {}
     if args.mode == 'batch':  # -> List[Dict[str, int]]
         # obtain workloads (List[str]) sperated by chunks, List[List[Dict[str, int]]]
         stream_of_chunks_dicts = generate_workload_chunk_stream(total_templates, base_templates, num_chunks=4, variation_type='query')
@@ -73,6 +76,16 @@ def main():
                 sqls.pop()
             num_wks = len(sqls) // wk_size
             flat_workload_stream_dicts = [{k: 1 for k in sqls[i*wk_size:(i+1)*wk_size]} for i in range(num_wks)]
+        else:
+            raise ValueError(f"{ws_file} can not be processed")
+
+    i = 1
+    for w in flat_workload_stream_dicts:
+        for qstr  in w:
+            q_tpl_hash = query_to_hash(qstr)
+            if q_tpl_hash not in hash2tid:
+                hash2tid[q_tpl_hash] = i
+                i += 1
 
     # with open(f'{args.mode}.tmp', 'wb') as f:
     #     pickle.dump(flat_workload_stream_dicts, f)
@@ -85,7 +98,7 @@ def main():
     # --- Step 2: Segment the stream into chunks ---
     difference_threshold = 10 # As per the generator's substitution rate
     logging.info(f"--- Step 2: Segmenting stream with a {difference_threshold}% threshold ---")
-    segmented_indices = segment_workloads(workload_stream_for_segmentation, difference_threshold)
+    segmented_indices = segment_workloads(workload_stream_for_segmentation, difference_threshold, hash2tid)
 
     logging.info(f"========== Segmentation Complete: Identified {len(segmented_indices)} Chunks ==========")
 

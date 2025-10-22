@@ -25,7 +25,7 @@ def read_queries(bm: str) -> Dict[str, List[str]]:
     return templates
 
 
-def generate_workload_chunk(templates, num_workloads, vary_frequency=True, queries_per_workload=14):
+def generate_workload_chunk(templates: Dict[str, str], num_workloads, vary_frequency=True, queries_per_workload=14):
     """Generates a single chunk of workloads from a given set of templates."""
     chunk = []
     template_items = list(templates.items())
