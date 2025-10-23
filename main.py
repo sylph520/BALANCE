@@ -228,11 +228,12 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         callbacks.append(multi_validation_callback)
 
     experiment.start_learning()
+    tb_log_name = 'tblog_'+experiment.experiment_folder_path.split('/')[-1]
 
     model.learn(
         total_timesteps=experiment.config["timesteps"],
         callback=callbacks,
-        tb_log_name=experiment.experiment_folder_path, ids=experiment.config["id"]
+        tb_log_name=tb_log_name, ids=experiment.config["id"]
     )
     experiment.finish_learning(
         training_env,

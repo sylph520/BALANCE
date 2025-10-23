@@ -225,7 +225,7 @@ class PlanEmbedder(WorkloadEmbedder):
 
                 value_vec = [0] * len(self.dictionary)
                 try:
-                    value = self.boo_creator.value_from_plan(plan)
+                    value = self.boo_creator.value_from_plan(plan, self.parameters)
                     for i, vv in enumerate(value):
                         if vv != None:
                             bow_i = self.dictionary.doc2bow([boo[i]])
@@ -366,8 +366,9 @@ class PlanEmbedderBOW(PlanEmbedder):
 
 
 class PlanEmbedderLSIBOW(PlanEmbedder):
-    def __init__(self, query_texts, representation_size, database_connector, columns, without_indexes=False):
+    def __init__(self, query_texts, representation_size, database_connector, columns, without_indexes=False, parameters=None):
         PlanEmbedder.__init__(self, query_texts, representation_size, database_connector, columns, without_indexes)
+        self.parameters = parameters
 
     def _create_model(self):
         self.lsi_bow = gensim.models.LsiModel(

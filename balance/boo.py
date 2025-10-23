@@ -22,26 +22,26 @@ class BagOfOperators(object):
         self.relevant_values = None
 
 
-    def value_from_plan(self, plan):
+    def value_from_plan(self, plan, parameters):
         self.relevant_values = []
-        self._parse_value_plan(plan)
+        self._parse_value_plan(plan, parameters)
 
         return self.relevant_values
 
-    def _parse_value_plan(self, plan):
+    def _parse_value_plan(self, plan, parameters):
         alias2table = {}
         get_alias2table(plan, alias2table)
 
         node_type = plan["Node Type"]
         if node_type in self.INTERESTING_OPERATORS:
-            node_value_representation = self._parse_value_node(plan, alias2table)
+            node_value_representation = self._parse_value_node(plan, alias2table, parameters)
             self.relevant_values.append(node_value_representation)
         if "Plans" not in plan:
             return
         for sub_plan in plan["Plans"]:
-            self._parse_value_plan(sub_plan)
+            self._parse_value_plan(sub_plan, parameters)
 
-    def _parse_value_node(self, node, alias2table):
+    def _parse_value_node(self, node, alias2table, parameters):
         relation_name, index_name = None, None
         if 'Relation Name' in node:
             relation_name = node['Relation Name']
@@ -50,14 +50,16 @@ class BagOfOperators(object):
 
         node_value_representation = None
 
+        # if node['Node Type'] != 'Hash Join':
+        #     __import__('ipdb').set_trace()
         if node["Node Type"] == "Seq Scan":
             if 'Filter' in node:
                 condition_seq_filter = pre2seq(node['Filter'], alias2table, relation_name, index_name)
-                node_value_representation = get_value_reps_mean(condition_seq_filter, relation_name, index_name)
+                node_value_representation = get_value_reps_mean(condition_seq_filter, relation_name, index_name, parameters)
         elif node["Node Type"] == "Index Only Scan":
             if 'Index Cond' in node:
                 condition_seq_index = pre2seq(node['Index Cond'], alias2table, relation_name, index_name)
-                node_value_representation = get_value_reps_mean(condition_seq_index, relation_name, index_name)
+                node_value_representation = get_value_reps_mean(condition_seq_index, relation_name, index_name, parameters)
         elif node["Node Type"] == "Index Scan":
             if 'Filter' in node:
                 condition_seq_filter = pre2seq(node['Filter'], alias2table, relation_name, index_name)
@@ -67,12 +69,12 @@ class BagOfOperators(object):
                 condition_seq_index = pre2seq(node['Index Cond'], alias2table, relation_name, index_name)
             else:
                 condition_seq_index = []
-            node_value_representation = get_value_reps_mean(condition_seq_filter+condition_seq_index, relation_name, index_name)
+            node_value_representation = get_value_reps_mean(condition_seq_filter+condition_seq_index, relation_name, index_name, parameters)
         elif node["Node Type"] == "CTE Scan":
             relation_name = node['CTE Name']
             if 'Filter' in node and node['Parent Relationship'] != 'Inner':
                 condition_seq_filter = pre2seq(node['Filter'], alias2table, relation_name, index_name)
-                node_value_representation = get_value_reps_mean(condition_seq_filter, relation_name, index_name)
+                node_value_representation = get_value_reps_mean(condition_seq_filter, relation_name, index_name, parameters)
         return node_value_representation
 
 

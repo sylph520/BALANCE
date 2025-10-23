@@ -100,11 +100,11 @@ def pre2seq(predicates, alias2table, relation_name, index_name):
         raise
     return predicates
 
-def get_value_reps_mean(conds, relation_name, index_name):
+def get_value_reps_mean(conds, relation_name, index_name, parameters):
     sum = 0
     cnt = 0
     for cond in conds:
-        cur = get_value_rep(cond, relation_name, index_name)
+        cur = get_value_rep(cond, relation_name, index_name, parameters)
         if cur != None:
             sum += cur
             cnt += 1
@@ -113,7 +113,7 @@ def get_value_reps_mean(conds, relation_name, index_name):
     return sum/cnt
 
 
-def get_value_rep(condition_op, relation_name, index_name):
+def get_value_rep(condition_op, relation_name, index_name, parameters):
     if condition_op is None:
         return None
     elif condition_op.op_type == 'Bool':
@@ -184,5 +184,5 @@ def getParameters(benchmark, use_new_box_line_format=False):
 
 # The 'parameters' object needs to be initialized with a default benchmark
 # This will be updated dynamically later in the Experiment class
-parameters = getParameters("TPCDS", use_new_box_line_format=False) # Default to TPCDS for initial load
+# parameters = getParameters("TPCDS", use_new_box_line_format=False) # Default to TPCDS for initial load
 # parameters = getParameters("TPCDS", use_new_box_line_format=True) # Default to TPCDS for initial load

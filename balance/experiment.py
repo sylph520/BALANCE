@@ -21,6 +21,7 @@ from . import utils
 from .configuration_parser import ConfigurationParser
 from .schema import Schema
 from .workload_generator import WorkloadGenerator
+from src.feature_extraction.predicate_features import getParameters
 
 class DummyWorkloadGenerator:
     """A simple, pickle-friendly class to hold pre-generated workloads."""
@@ -196,6 +197,7 @@ class Experiment(object):
         )#
 
         if "workload_embedder" in self.config:
+            params = getParameters(benchmark=self.config["workload"]["benchmark"], use_new_box_line_format=self.config['use_new_box_line_format'])
             workload_embedder_class = getattr(
                 importlib.import_module("balance.workload_embedder"), self.config["workload_embedder"]["type"]
             )
@@ -205,6 +207,7 @@ class Experiment(object):
                 self.config["workload_embedder"]["representation_size"] - 10, # 40 = representation size(50) - value size(10)
                 workload_embedder_connector,
                 self.globally_indexable_columns,
+                parameters = params
             )
 
         self.multi_validation_wl = []
