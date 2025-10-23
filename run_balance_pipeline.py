@@ -32,6 +32,7 @@ def main():
     parser.add_argument('--ws_file', type=str, default='')
     parser.add_argument('--wk_size', type=int, default=14)
     parser.add_argument('--ts', type=int, default=0)
+    parser.add_argument('--newf', action='store_true', default=False)
     args = parser.parse_args()
 
     benchmark = args.bm
@@ -152,7 +153,7 @@ def main():
         logging.info(f"Starting training for Chunk {chunk_number}...")
         try:
             freq_label = 'varyFreq' if config['workload']['varying_frequencies'] else 'uniFreq'
-            res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'], uni_freq=freq_label, fix_index_count=config['fix_index_count'])
+            res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'], uni_freq=freq_label, fix_index_count=config['fix_index_count'], newf=args.newf)
             logging.info(f"--- Training for Chunk {chunk_number} completed successfully. ---")
 
             # g. Update the source model path for the next iteration

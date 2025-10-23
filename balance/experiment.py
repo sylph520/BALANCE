@@ -33,7 +33,7 @@ class DummyWorkloadGenerator:
         self.number_of_query_classes = number_of_query_classes
 
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0, lsi_dimension=None):
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0, lsi_dimension=None, newf=False):
         """
         setup the experiment from configuration, random seed, and related method info
         """
@@ -47,6 +47,10 @@ class Experiment(object):
             self.config['workload']['varying_frequencies'] = False
         if fix_index_count:
             self.fix_index_count = fix_index_count
+        if newf:
+            self.config['use_new_box_line_format'] = True
+        else:
+            self.config['use_new_box_line_format'] = False
         # __import__('ipdb').set_trace()
         if ts:
             self.config['timesteps'] = ts
@@ -826,7 +830,7 @@ class Experiment(object):
                 importlib.import_module("balance.observation_manager"), self.config["observation_manager"]
             )
             observation_manager = observation_manager_class(
-                action_manager.number_of_columns, observation_manager_config, self.config["workload"]["benchmark"]
+                action_manager.number_of_columns, observation_manager_config, self.config["workload"]["benchmark"], self.config.get("use_new_box_line_format", False)
             )
 
             if self.number_of_features is None:

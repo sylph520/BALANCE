@@ -152,13 +152,13 @@ from balance.utils import *
 # Todo: Rename. Single/multi-column is not handled by the ObservationManager anymore.
 # All managers are capable of handling single and multi-attribute indexes now.
 class SingleColumnIndexPlanEmbeddingObservationManagerWithCost(EmbeddingObservationManager):
-    def __init__(self, number_of_actions, config, benchmark):
+    def __init__(self, number_of_actions, config, benchmark, use_new_box_line_format=False):
         super().__init__(number_of_actions, config)
 
         self.UPDATE_EMBEDDING_PER_OBSERVATION = True
         ########################################
         self.db_connector = self.workload_embedder.database_connector
-        self.parameters = self.getParameters(benchmark)
+        self.parameters = self.getParameters(benchmark, use_new_box_line_format)
         
         print("use boo")
         # This overwrites EmbeddingObservationManager's features
@@ -175,8 +175,8 @@ class SingleColumnIndexPlanEmbeddingObservationManagerWithCost(EmbeddingObservat
             + 1  # The current workload cost
         )
 
-    def getParameters(self, benchmark):
-        column2pos, tables_id, columns_id, physic_ops_id, compare_ops_id, bool_ops_id, tables, columnTypeisNum, box_lines = prepare_dataset(benchmark)
+    def getParameters(self, benchmark, use_new_box_line_format):
+        column2pos, tables_id, columns_id, physic_ops_id, compare_ops_id, bool_ops_id, tables, columnTypeisNum, box_lines = prepare_dataset(benchmark, use_new_box_line_format)
         table_total_num = len(tables_id)
         column_total_num = len(columns_id)
         physic_op_total_num = len(physic_ops_id)

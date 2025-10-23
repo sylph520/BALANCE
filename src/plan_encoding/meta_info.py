@@ -196,11 +196,12 @@ def obtain_upper_bound_query_size(path):
     return plan_node_max_num, condition_max_num, cost_label_min, cost_label_max, card_label_min, card_label_max
 
 
-def prepare_dataset(benchmark):
+def prepare_dataset(benchmark, use_new_box_line_format=False):
 
     column2pos = dict()
 
-    if benchmark == "TPCH":
+    if False:
+    # if benchmark == "TPCH":
         tables = ['customer', 'lineitem', 'nation',
                   'orders', 'part', 'partsupp', 'region', 'supplier']
 
@@ -262,10 +263,15 @@ def prepare_dataset(benchmark):
             'supplier.s_comment'
         ]
 
-    elif benchmark == "TPCDS" or benchmark == "TPCDSC":
+    # elif benchmark == "TPCDS" or benchmark == "TPCDSC":
+    if True:
         column2pos, columnTypeisNum  = get_column2pos_dict(benchmark)
         tables = list(column2pos.keys())
-        box_line_file = 'tpcds_box_line.pickle'
+        if use_new_box_line_format:
+            dformat = 'new'
+        else:
+            dformat = 'old'
+        box_line_file = f'{benchmark.lower()}_box_line_{dformat}.pickle'
     else:
         raise ValueError(f"Unsupported benchmark: {benchmark}")
 
@@ -288,32 +294,48 @@ def prepare_dataset(benchmark):
             column_id += 1
 
     box_lines = pickle.load(open(box_line_file, 'rb'))
-    # __import__('ipdb').set_trace()
 
-    for table, columns in box_lines.items():
-        for column, box_line in columns.items():
-            column_name = table + '.' + column
-            if column_name in columnTypeisNum:
-                for i in range(len(box_line)):
-                    box_line[i] = float(box_line[i])
-            else:
-                for i in range(len(box_line)):
-                    box_line[i] = str(box_line[i])
+    # __import__('ipdb').set_trace()
+    if use_new_box_line_format:
+        for table, columns in box_lines.items():
+            for column, column_data in columns.items():
+                # Ensure min/max are floats for numeric, and bins are strings for string
+                if column_data['type'] == 'numeric':
+                    column_data['min'] = float(column_data['min'])
+                    column_data['max'] = float(column_data['max'])
+                elif column_data['type'] == 'string':
+                    column_data['bins'] = [str(b) for b in column_data['bins']]
+    else:
+        for table, columns in box_lines.items():
+            for column, box_line in columns.items():
+                column_name = table + '.' + column
+                if column_name in columnTypeisNum:
+                    for i in range(len(box_line)):
+                        box_line[i] = float(box_line[i])
+                else:
+                    for i in range(len(box_line)):
+                        box_line[i] = str(box_line[i])
 
     return column2pos, tables_id, columns_id, physic_ops_id, compare_ops_id, bool_ops_id, tables, columnTypeisNum, box_lines
 
+def get_tables(conn) -> list:
+    with conn.cursor() as cur:
+        get_tbls_stmt = "select table_name from information_schema.tables where table_schema='public' and table_name != 'hypopg_list_indexes' and table_name != 'hypopg_hidden_indexes' order by table_name;"
+        cur.execute(get_tbls_stmt)
+        tbl_res = cur.fetchall()
+        tbl_names = [i[0] for i in tbl_res]
+    return tbl_names
+
 
 def get_column2pos_dict(benchmark):
-    if benchmark.lower() in ['tpcds', 'tpcdsc']:
+    if benchmark.lower() in ['tpch', 'tpchc']:
+        dbname = 'indexselection_tpch___1'
+    elif benchmark.lower() in ['tpcds', 'tpcdsc']:
         dbname = 'indexselection_tpcds___10'
     else:
         raise ValueError(f"{benchmark} not handled in get_column2pos_dict() yet")
     conn = psycopg2.connect(database=dbname, port=51204, host='/tmp')
-    with conn.cursor() as cur:
-        get_tbls_stmt = "select table_name from information_schema.tables where table_schema='public' order by table_name;"
-        cur.execute(get_tbls_stmt)
-        tbl_res = cur.fetchall()
-        tbl_names = [i[0] for i in tbl_res]
+    tbl_names = get_tables(conn)
 
     column2pos = {}
 
@@ -338,13 +360,16 @@ def get_column2pos_dict(benchmark):
     return column2pos, colIsNum
 
 
-def main(benchmark):
+def main(benchmark, use_new_box_line_format):
     # print(get_column2pos_dict('tpcds'))
-    prepare_dataset(benchmark.upper())
+    prepare_dataset(benchmark.upper(), use_new_box_line_format)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bm', type=str, default='tpcds')
+    # parser.add_argument('--bm', type=str, default='tpcds')
+    parser.add_argument('--bm', type=str, default='tpch')
+    parser.add_argument('--newf', action='store_true', default=False)
     args = parser.parse_args()
     benchmark = args.bm
-    main(benchmark)
+    newf = args.newf
+    main(benchmark, newf)

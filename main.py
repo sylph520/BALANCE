@@ -20,12 +20,12 @@ random.seed(0)
 use_gpu = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = use_gpu
 
-def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0, test_workload='', test_workload_qids=''):
+def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0, test_workload='', test_workload_qids='', newf=False):
     CONFIGURATION_FILE = configuration_file
 
     logging.warning("use gpu:" + use_gpu)
     if test_only:
-        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts)
+        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, newf=newf)
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
@@ -257,14 +257,15 @@ if __name__ == "__main__":
     parser.add_argument('--fix_index_count', type=int, default=0)
     parser.add_argument('--test_workload', type=str, help='Path to a .sql file to use as a custom test workload.')
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
+    parser.add_argument('--newf', action='store_true', default=False)
     args = parser.parse_args()
 
     if args.config:
         config_file = args.config
     else:
         config_file = f"experiments/{(args.wk_type).lower()}.json"
-    
+
     run_single_experiment(config_file, test_only=args.test_only, uni_freq=args.uni_freq,\
                             fix_index_count=args.fix_index_count, ts=args.ts,
-                            test_workload=args.test_workload, test_workload_qids = args.test_workload_qids)
+                            test_workload=args.test_workload, test_workload_qids = args.test_workload_qids, newf=args.newf)
 

@@ -43,7 +43,11 @@ def get_str_representation_box(value, t_column, parameters):
 def get_idx_box(v, t_column, parameters):
     import datetime
     import decimal
-    box_lines = parameters.box_lines[t_column.split('.')[0]][t_column.split('.')[1]]
+    try:
+        box_lines = parameters.box_lines[t_column.split('.')[0]][t_column.split('.')[1]]
+    except KeyError:
+        raise ValueError(f"KeyError: Missing box_lines data for {t_column}. Returning default index 0.")
+
     if(isinstance(box_lines[0],datetime.date)):
             v=datetime.date(int(v.split('-')[0]),int(v.split('-')[1]),int(v.split('-')[2]))
     elif(isinstance(box_lines[0],decimal.Decimal)):

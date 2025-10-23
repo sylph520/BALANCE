@@ -167,8 +167,8 @@ def get_value_rep(condition_op, relation_name, index_name):
 
 from src.plan_encoding.meta_info import *
 from src.parameters import *
-def getParameters(benchmark):
-    column2pos, tables_id, columns_id, physic_ops_id, compare_ops_id, bool_ops_id, tables, columnTypeisNum, box_lines = prepare_dataset(benchmark)
+def getParameters(benchmark, use_new_box_line_format=False):
+    column2pos, tables_id, columns_id, physic_ops_id, compare_ops_id, bool_ops_id, tables, columnTypeisNum, box_lines = prepare_dataset(benchmark, use_new_box_line_format)
     table_total_num = len(tables_id)
     column_total_num = len(columns_id)
     physic_op_total_num = len(physic_ops_id)
@@ -182,6 +182,7 @@ def getParameters(benchmark):
                 bool_ops_total_num, compare_ops_total_num, box_num, columnTypeisNum, box_lines)
     return parameters
 
-if __name__ == "__main__":
-    parameters = getParameters('tpcds')
-    print(parameters)
+# The 'parameters' object needs to be initialized with a default benchmark
+# This will be updated dynamically later in the Experiment class
+parameters = getParameters("TPCDS", use_new_box_line_format=False) # Default to TPCDS for initial load
+# parameters = getParameters("TPCDS", use_new_box_line_format=True) # Default to TPCDS for initial load
