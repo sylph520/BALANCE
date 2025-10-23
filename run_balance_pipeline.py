@@ -133,6 +133,7 @@ def main():
             config['fix_index_count'] = config.get('fix_index_count', 0)
 
         workload_pickle_path = f"experiment_results/{args.mode}/{benchmark}_workloads_chunk_{chunk_number}.pkl"
+        os.makedirs(os.path.dirname(workload_pickle_path), exist_ok=True)
         with open(workload_pickle_path, 'wb') as f:
             pickle.dump(chunk_workloads, f)
         config['load_workloads_from_file'] = workload_pickle_path

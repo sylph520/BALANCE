@@ -826,7 +826,7 @@ class Experiment(object):
                 importlib.import_module("balance.observation_manager"), self.config["observation_manager"]
             )
             observation_manager = observation_manager_class(
-                action_manager.number_of_columns, observation_manager_config
+                action_manager.number_of_columns, observation_manager_config, self.config["workload"]["benchmark"]
             )
 
             if self.number_of_features is None:

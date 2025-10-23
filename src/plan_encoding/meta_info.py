@@ -1,12 +1,16 @@
 import json
 import math
 import pickle
+import argparse
+import psycopg2
 
 
-def load_numeric_min_max(path):
+def load_numeric_min_max(path) -> dict:
+    """load min/max info dict from file"""
     with open(path,'r') as f:
         min_max_column = json.loads(f.read())
     return min_max_column
+
 
 def determine_prefix(column):
     relation_name = column.split('.')[0]
@@ -146,6 +150,7 @@ def determine_prefix(column):
         print (column)
         raise
 
+
 def obtain_upper_bound_query_size(path):
     plan_node_max_num = 0
     condition_max_num = 0
@@ -190,42 +195,79 @@ def obtain_upper_bound_query_size(path):
     print (card_label_min, card_label_max)
     return plan_node_max_num, condition_max_num, cost_label_min, cost_label_max, card_label_min, card_label_max
 
-def prepare_dataset():
+
+def prepare_dataset(benchmark):
 
     column2pos = dict()
 
-    tables = ['customer', 'lineitem', 'nation',
-              'orders', 'part', 'partsupp', 'region', 'supplier']
+    if benchmark == "TPCH":
+        tables = ['customer', 'lineitem', 'nation',
+                  'orders', 'part', 'partsupp', 'region', 'supplier']
 
-    # for table_name in tables:
-    #     column2pos[table_name] = database[table_name].columns
+        column2pos['customer'] = {
+            'c_mktsegment': 0, 'c_nationkey': 1, 'c_custkey': 2
+        }
+        column2pos['lineitem'] = {
+            'l_shipinstruct': 0, 'l_partkey': 1, 'l_commitdate': 2, 'l_suppkey': 3, 'l_returnflag': 4, 'l_orderkey': 5,
+            'l_shipdate': 6, 'l_quantity': 7, 'l_shipmode': 8, 'l_receiptdate': 9
+        }
+        column2pos['nation'] = {
+            'n_nationkey': 0, 'n_name': 1, 'n_regionkey': 2
+        }
+        column2pos['orders'] = {
+            'o_comment': 0, 'o_orderkey': 1, 'o_orderstatus': 2, 'o_shippriority': 3, 'o_custkey': 4, 'o_orderpriority': 5,
+            'o_orderdate': 6
+        }
+        column2pos['part'] = {
+            'p_size': 0, 'p_partkey': 1, 'p_container': 2, 'p_brand': 3, 'p_name': 4, 'p_type': 5
+        }
+        column2pos['partsupp'] = {
+            'ps_partkey': 0, 'ps_suppkey': 1
+        }
+        column2pos['region'] = {
+            'r_name': 0, 'r_regionkey': 1
+        }
+        column2pos['supplier'] = {
+            's_suppkey': 0, 's_nationkey': 1, 's_name': 2, 's_comment': 3
+        }
+        box_line_file = 'tpch_box_line.pickle'
 
-    column2pos['customer'] = {
-        'c_mktsegment': 0, 'c_nationkey': 1, 'c_custkey': 2
-    }
-    column2pos['lineitem'] = {
-        'l_shipinstruct': 0, 'l_partkey': 1, 'l_commitdate': 2, 'l_suppkey': 3, 'l_returnflag': 4, 'l_orderkey': 5,
-        'l_shipdate': 6, 'l_quantity': 7, 'l_shipmode': 8, 'l_receiptdate': 9
-    }
-    column2pos['nation'] = {
-        'n_nationkey': 0, 'n_name': 1, 'n_regionkey': 2
-    }
-    column2pos['orders'] = {
-        'o_comment': 0, 'o_orderkey': 1, 'o_orderstatus': 2, 'o_shippriority': 3, 'o_custkey': 4, 'o_orderpriority': 5,
-        'o_orderdate': 6
-    }
-    column2pos['part'] = {
-        'p_size': 0, 'p_partkey': 1, 'p_container': 2, 'p_brand': 3, 'p_name': 4, 'p_type': 5
-    }
-    column2pos['partsupp'] = {
-        'ps_partkey': 0, 'ps_suppkey': 1
-    }
-    column2pos['region'] = {
-        'r_name': 0, 'r_regionkey': 1
-    }
-    column2pos['supplier'] = {
-        's_suppkey': 0, 's_nationkey': 1, 's_name': 2, 's_comment': 3
-    }
+        columnTypeisNum = [
+            'customer.c_custkey',
+            'customer.c_nationkey',
+            'lineitem.l_partkey',
+            'lineitem.l_orderkey',
+            'lineitem.l_linenumber',
+            'lineitem.l_suppkey',
+            'nation.n_nationkey',
+            'nation.n_regionkey',
+            'orders.o_orderkey',
+            'orders.o_shippriority',
+            'orders.o_custkey',
+            'orders.o_orderpriority',
+            'orders.o_orderdate',
+            'part.p_size',
+            'part.p_partkey',
+            'part.p_container',
+            'part.p_brand',
+            'part.p_name',
+            'part.p_type',
+            'partsupp.ps_partkey',
+            'partsupp.ps_suppkey',
+            'region.r_name',
+            'region.r_regionkey',
+            'supplier.s_suppkey',
+            'supplier.s_nationkey',
+            'supplier.s_name',
+            'supplier.s_comment'
+        ]
+
+    elif benchmark == "TPCDS" or benchmark == "TPCDSC":
+        column2pos, columnTypeisNum  = get_column2pos_dict(benchmark)
+        tables = list(column2pos.keys())
+        box_line_file = 'tpcds_box_line.pickle'
+    else:
+        raise ValueError(f"Unsupported benchmark: {benchmark}")
 
     physic_ops_id = {'Materialize':1, 'Sort':2, 'Hash':3, 'Merge Join':4, 'Bitmap Index Scan':5,
                      'Index Only Scan':6, 'BitmapAnd':7, 'Nested Loop':8, 'Aggregate':9, 'Result':10,
@@ -245,27 +287,8 @@ def prepare_dataset():
             columns_id[table_name+'.'+column] = column_id
             column_id += 1
 
-    columnTypeisNum = [
-        'customer.c_custkey',
-        'customer.c_nationkey',
-        'lineitem.l_partkey',
-        'lineitem.l_orderkey',
-        'lineitem.l_linenumber',
-        'lineitem.l_suppkey',
-        'nation.n_nationkey',
-        'nation.n_regionkey',
-        'orders.o_orderkey',
-        'orders.o_shippriority',
-        'orders.o_custkey',
-        'part.p_size',
-        'part.p_partkey',
-        'partsupp.ps_partkey',
-        'partsupp.ps_suppkey',
-        'region.r_regionkey',
-        'supplier.s_suppkey',
-        'supplier.s_nationkey'
-    ]
-    box_lines = pickle.load(open('box_line.pickle', 'rb'))
+    box_lines = pickle.load(open(box_line_file, 'rb'))
+    # __import__('ipdb').set_trace()
 
     for table, columns in box_lines.items():
         for column, box_line in columns.items():
@@ -278,3 +301,50 @@ def prepare_dataset():
                     box_line[i] = str(box_line[i])
 
     return column2pos, tables_id, columns_id, physic_ops_id, compare_ops_id, bool_ops_id, tables, columnTypeisNum, box_lines
+
+
+def get_column2pos_dict(benchmark):
+    if benchmark.lower() in ['tpcds', 'tpcdsc']:
+        dbname = 'indexselection_tpcds___10'
+    else:
+        raise ValueError(f"{benchmark} not handled in get_column2pos_dict() yet")
+    conn = psycopg2.connect(database=dbname, port=51204, host='/tmp')
+    with conn.cursor() as cur:
+        get_tbls_stmt = "select table_name from information_schema.tables where table_schema='public' order by table_name;"
+        cur.execute(get_tbls_stmt)
+        tbl_res = cur.fetchall()
+        tbl_names = [i[0] for i in tbl_res]
+
+    column2pos = {}
+
+    colIsNum = []
+    # __import__('ipdb').set_trace()
+    for tbl_name in tbl_names:
+        get_cols_stmt = f"select column_name, ordinal_position-1 as order_idx, data_type from information_schema.columns where table_name = '{tbl_name}' order by order_idx"
+        tbl_col_dict = {}
+        with conn.cursor() as cur:
+            cur.execute(get_cols_stmt)
+            cols_res = cur.fetchall()
+        for col in cols_res:
+            col_name, col_idx, dtype = col
+            tbl_col_dict[col_name] = col_idx
+            if dtype not in ['integer', 'numeric', 'float', 'character', 'text', 'date', 'character varying', 'time without time zone']:
+                print(dtype)
+            if dtype.lower() in ['integer', 'numeric', 'float']:
+                colIsNum.append(f"{tbl_name}.{col_name}")
+
+        column2pos[tbl_name] = tbl_col_dict
+
+    return column2pos, colIsNum
+
+
+def main(benchmark):
+    # print(get_column2pos_dict('tpcds'))
+    prepare_dataset(benchmark.upper())
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--bm', type=str, default='tpcds')
+    args = parser.parse_args()
+    benchmark = args.bm
+    main(benchmark)

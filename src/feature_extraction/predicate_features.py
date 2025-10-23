@@ -122,7 +122,6 @@ def get_value_rep(condition_op, relation_name, index_name):
         left_value = condition_op.left_value
         right_value = condition_op.right_value
 
-   
         if re.match(r'.+\..+', left_value) is None:
             if relation_name is None:
                 relation_name = index_name.split(left_value)[1].strip('_')
@@ -130,21 +129,17 @@ def get_value_rep(condition_op, relation_name, index_name):
         else:
             relation_name = left_value.split('.')[0]
 
-      
         if relation_name not in parameters.tables_id:
             return None
         else:
-         
             if re.match(r'^[a-z][a-zA-Z0-9_]*\.[a-z][a-zA-Z0-9_]*$', right_value) is not None \
                     and right_value.split('.')[0] in parameters.tables_id:
                 return None
-       
             elif re.match(r'^[a-z][a-zA-Z0-9_]*\.[a-z][a-zA-Z0-9_]*$', right_value) is not None \
                     and right_value.split('.')[0] not in parameters.tables_id:
                 return None
             elif right_value == 'None':
                 return None
-      
             elif left_value in parameters.columnTypeisNum:
                 try:
                     right_value = float(right_value)
@@ -152,7 +147,6 @@ def get_value_rep(condition_op, relation_name, index_name):
                     return right_value_idx
                 except:
                     return None
-     
             elif re.match(r'^__LIKE__', right_value) is not None:
                 right_value = right_value.strip('\'')[8:]
                 right_value_idxs = get_str_representation_box(right_value, left_value, parameters)
@@ -173,8 +167,8 @@ def get_value_rep(condition_op, relation_name, index_name):
 
 from src.plan_encoding.meta_info import *
 from src.parameters import *
-def getParameters():
-    column2pos, tables_id, columns_id, physic_ops_id, compare_ops_id, bool_ops_id, tables, columnTypeisNum, box_lines = prepare_dataset()
+def getParameters(benchmark):
+    column2pos, tables_id, columns_id, physic_ops_id, compare_ops_id, bool_ops_id, tables, columnTypeisNum, box_lines = prepare_dataset(benchmark)
     table_total_num = len(tables_id)
     column_total_num = len(columns_id)
     physic_op_total_num = len(physic_ops_id)
@@ -188,4 +182,6 @@ def getParameters():
                 bool_ops_total_num, compare_ops_total_num, box_num, columnTypeisNum, box_lines)
     return parameters
 
-parameters = getParameters()
+if __name__ == "__main__":
+    parameters = getParameters('tpcds')
+    print(parameters)
