@@ -252,8 +252,8 @@ class PPO2(ActorCriticRLModel):
                     self.e = tf.placeholder(tf.float32, (), 'e')
                     self.op_w = tf.placeholder(tf.float32, shape=[None,None], name='op_w')
 
-                    self.opops1 = [1,1,1]
-                    self.opops2 = [1/(3-i) for i in self.opops1]
+                    self.opops1 = [1 for _ in range(self.OT.option_dim)] # This list is not directly used in the weighting formula now
+                    self.opops2 = [1 / (self.OT.option_dim - o) for o in range(self.OT.option_dim)] # Increasing weight for options based on index
 
                     self.flag_wlm = False
                     self.ptf = 1
