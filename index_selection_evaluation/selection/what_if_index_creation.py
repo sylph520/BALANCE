@@ -28,18 +28,14 @@ class WhatIfIndexCreation:
         self.db_connector.drop_simulated_index(oid)
         del self.simulated_indexes[oid]
 
-    def get_hypopg_version(self) -> bool:
-        cur = self.connection.cursor()
+    def get_hypopg_version(self):
+        cur = self.db_connector._connection.cursor()
         cur.execute("SELECT default_version FROM pg_available_extensions WHERE name ='hypopg';")
         version = cur.fetchone()[0]
         return version
 
-
     def all_simulated_indexes(self):
-        if version > '1.1.3':
-            statement = "select * from hypopg_list_indexes;"
-        else:
-            statement = "select * from hypopg_list_indexes();"
+        statement = "select * from hypopg_list_indexes();"
 
         indexes = self.db_connector.exec_fetch(statement, one=False)
         return indexes
