@@ -4,7 +4,7 @@ from .query_hasher import query_to_hash
 # Configure logging for clear output
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-def segment_workloads(workload_stream, difference_threshold_x, hash2tid: dict):
+def segment_workloads(workload_stream, difference_threshold_x, hash2tid: dict, dbname: str):
     """
     Segments a stream of workloads into chunks based on template differences.
 
@@ -24,7 +24,7 @@ def segment_workloads(workload_stream, difference_threshold_x, hash2tid: dict):
     for i in workload_stream:
         w_tids = set()
         for j in i:
-            h = query_to_hash(j)
+            h, j = query_to_hash(j, dbname=dbname, unify_similar_ops=True)
             tid =  hash2tid[h]
             w_tids.add(tid)
         workload_stream_ids.append(w_tids)

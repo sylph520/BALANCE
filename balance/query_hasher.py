@@ -1,19 +1,29 @@
 import re
 import hashlib
 import argparse
+from pglast.stream import RawStream
+from balance.sql_optimize import optimize_sql_string
 
-def query_to_hash_text(query: str) -> str:
+def query_to_hash_text(query: str, unify_similar_ops: bool = False, dbname='') -> tuple:
     """
     Convert SQL query to normalized template hash using text operations.
     """
     if not query or not query.strip():
-        return None
+        raise ValueError("query_to_hash_text: empty incoming query")
+
+    # __import__('ipdb').set_trace()
+    query = optimize_sql_string(query, {"database": dbname, "host":"/tmp", "port": 51204})
 
     # Normalize: lowercase, single spaces
     normalized = re.sub(r'\s+', ' ', query.strip()).lower()
 
+    # Optionally unify all comparison operators to a single token
+    if unify_similar_ops:
+        normalized = re.sub(r'<=|>=|<|>|=', ' CMP ', normalized)
+
     # Replace all parameter types with ?
     patterns = [
+        (r"cast\s*\(\s*'[^']*'\s*as\s*\w+\s*\)", "?"),  # CAST('value' AS type) - entire expression
         (r"'[^']*'", "?"),           # Strings
         (r'"[^"]*"', "?"),           # Identifiers
         (r'\b\d+\.?\d*\b', "?"),     # Numbers
@@ -26,9 +36,9 @@ def query_to_hash_text(query: str) -> str:
 
     # Clean up and hash
     normalized = re.sub(r'\?\s*\?', "?", normalized).strip()
-    return hashlib.md5(normalized.encode()).hexdigest()
+    return hashlib.md5(normalized.encode()).hexdigest(), normalized
 
-def query_to_hash_ast(query: str) -> str:
+def query_to_hash_ast(query: str, unify_similar_ops, dbname) -> str:
     """
     Convert SQL query to normalized template hash using AST parsing.
     """
@@ -69,35 +79,37 @@ def query_to_hash_ast(query: str) -> str:
         normalized_ast = normalize_node(parsed)
 
         # Convert back to SQL (this gives us the normalized query)
-        normalized_sql = pglast.print_sql(normalized_ast)
+        normalized_sql = RawStream()(normalized_ast)
 
         # Generate hash
-        return hashlib.md5(normalized_sql.encode()).hexdigest()
+        return hashlib.md5(normalized_sql.encode()).hexdigest(), normalized_ast
 
     except Exception as e:
         print(f"AST parsing failed for query, falling back to text: {e}")
         return query_to_hash_text(query)
 
-def query_to_hash(query: str, use_ast: bool = False) -> str:
+def query_to_hash(query: str, use_ast: bool = False, unify_similar_ops: bool = False, dbname='') -> str:
     """
     Convert SQL query to normalized template hash.
 
     Args:
         query: SQL query string
         use_ast: If True, use AST parsing; if False, use text operations
+        unify_similar_ops: If True, treat all comparison operators as the same
     """
     if use_ast:
-        return query_to_hash_ast(query)
+        return query_to_hash_ast(query, unify_similar_ops=unify_similar_ops, dbname=dbname)
     else:
-        return query_to_hash_text(query)
+        return query_to_hash_text(query, unify_similar_ops=unify_similar_ops, dbname=dbname)
 
-def process_sql_file(filename: str, use_ast: bool = False) -> dict:
+def process_sql_file(filename: str, use_ast: bool = False, unify_similar_ops: bool = False, dbname='') -> dict:
     """
     Process a SQL file and count query templates.
 
     Args:
         filename: Path to SQL file (one query per line)
         use_ast: Whether to use AST parsing
+        unify_similar_ops: If True, treat all comparison operators as the same
 
     Returns:
         Dictionary with template counts and examples
@@ -113,7 +125,7 @@ def process_sql_file(filename: str, use_ast: bool = False) -> dict:
                 if not query or query.startswith('--'):
                     continue
 
-                template_hash = query_to_hash(query, use_ast)
+                template_hash, _ = query_to_hash(query, use_ast, unify_similar_ops, dbname=dbname)
                 if template_hash:
                     if template_hash not in templates:
                         templates[template_hash] = {
@@ -160,7 +172,9 @@ def main():
     parser = argparse.ArgumentParser(description='Convert SQL queries to template hashes')
     parser.add_argument('filename', nargs='?', help='SQL file to process')
     parser.add_argument('--query', help='Single query to convert')
+    parser.add_argument('--dbname', help='dbname')
     parser.add_argument('--ast', action='store_true', help='Use AST parsing instead of text operations')
+    parser.add_argument('--unify-ops', action='store_true', help='Unify comparison operators like <, > into a single token')
     parser.add_argument('--generate-sample', type=int, help='Generate sample file with N queries')
 
     args = parser.parse_args()
@@ -173,14 +187,14 @@ def main():
 
     if args.query:
         # Process single query
-        template_hash = query_to_hash(args.query, args.ast)
+        template_hash = query_to_hash(args.query, args.ast, args.unify_ops, args.dbname)
         print(f"Method: {method}")
         print(f"Query: {args.query}")
         print(f"Template Hash: {template_hash}")
 
     elif args.filename:
         # Process file
-        templates = process_sql_file(args.filename, args.ast)
+        templates = process_sql_file(args.filename, args.ast, args.unify_ops)
         print(f"\nMethod: {method}")
         print(f"Found {len(templates)} unique query templates:")
 
@@ -215,7 +229,7 @@ def test_both_methods():
     print("=" * 60)
 
     for query in test_queries:
-        text_hash = query_to_hash_text(query)
+        text_hash, _ = query_to_hash_text(query)
         ast_hash = query_to_hash_ast(query)
 
         print(f"Query: {query}")

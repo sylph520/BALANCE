@@ -33,24 +33,36 @@ def main():
     parser.add_argument('--wk_size', type=int, default=14)
     parser.add_argument('--ts', type=int, default=0)
     parser.add_argument('--newf', action='store_true', default=False)
+    parser.add_argument('--uniComp', action='store_true', default=False)
     args = parser.parse_args()
 
     benchmark = args.bm
     # --- Step 1: Generate a continuous stream of workloads ---
     logging.info("--- Step 1: Generating a continuous workload stream ---")
-    total_templates = {}
-    total_templates.update(read_queries(benchmark))
-    if args.mode == 'batch':
-        tpl_sample_size = 14
-    else:
-        tpl_sample_size = args.wk_size
-    base_templates = {k: total_templates[k] for k in list(total_templates.keys())[:tpl_sample_size]}
 
-    # Generate 4 varied sets of 300 workloads each
     # __import__('ipdb').set_trace()
+
+    base_config_path = f'experiments/{benchmark}_idxcount_base_config.json'
+
+    with open(base_config_path, 'r') as f:
+        base_config = json.load(f)
+
+    if args.ts:
+        base_config['timesteps'] = args.ts
+
+    schema = Schema(base_config["workload"]["benchmark"], base_config["workload"]["scale_factor"], base_config["database"], base_config["column_filters"])
+    parsing_workload_generator = WorkloadGenerator(base_config["workload"], spath=base_config["workload"]["path"], workload_columns=schema.columns, random_seed=0, database_name="", experiment_id="")
 
     hash2tid = {}
     if args.mode == 'batch':  # -> List[Dict[str, int]]
+        # Generate 4 varied sets of 300 workloads each
+        total_templates = {}
+        total_templates.update(read_queries(benchmark))
+        if args.mode == 'batch':
+            tpl_sample_size = 14
+        else:
+            tpl_sample_size = args.wk_size
+        base_templates = {k: total_templates[k] for k in list(total_templates.keys())[:tpl_sample_size]}
         # obtain workloads (List[str]) sperated by chunks, List[List[Dict[str, int]]]
         stream_of_chunks_dicts = generate_workload_chunk_stream(total_templates, base_templates, num_chunks=4, variation_type='query')
         # Flatten the stream and prepare for segmentation
@@ -82,9 +94,27 @@ def main():
             raise ValueError(f"{ws_file} can not be processed")
 
     i = 1
+    tpl_stream = []
+    use_ast= True
+    schema_dict = {}
+    for t in schema.tables:
+        schema_dict[t.name] = [c.name for c  in t.columns]
+
+    dbname = ''
+    if benchmark in ['tpch', 'tpchc']:
+        dbname = 'indexselection_tpch___1'
+    elif benchmark in ['tpcds', 'tpcdsc']:
+        dbname = 'indexselection_tpcds___10'
+    elif benchmark in ['ceb', 'job']:
+        dbname = 'indexselection_job___1'
+    else:
+        raise ValueError(f"{dbname} not supported")
+
+    # __import__('ipdb').set_trace()
     for w in flat_workload_stream_dicts:
         for qstr  in w:
-            q_tpl_hash = query_to_hash(qstr)
+            q_tpl_hash, tpl = query_to_hash(qstr, unify_similar_ops=args.uniComp, dbname=dbname)
+            tpl_stream.append(tpl)
             if q_tpl_hash not in hash2tid:
                 hash2tid[q_tpl_hash] = i
                 i += 1
@@ -100,22 +130,12 @@ def main():
     # --- Step 2: Segment the stream into chunks ---
     difference_threshold = 10 # As per the generator's substitution rate
     logging.info(f"--- Step 2: Segmenting stream with a {difference_threshold}% threshold ---")
-    segmented_indices = segment_workloads(workload_stream_for_segmentation, difference_threshold, hash2tid)
+    segmented_indices = segment_workloads(workload_stream_for_segmentation, difference_threshold, hash2tid, dbname=dbname)
 
     logging.info(f"========== Segmentation Complete: Identified {len(segmented_indices)} Chunks ==========")
 
     # --- Step 3: Process chunks sequentially with policy transfer ---
     source_model_pool = []
-    base_config_path = f'experiments/{benchmark}_idxcount_base_config.json'
-
-    with open(base_config_path, 'r') as f:
-        base_config = json.load(f)
-
-    if args.ts:
-        base_config['timesteps'] = args.ts
-
-    schema = Schema(base_config["workload"]["benchmark"], base_config["workload"]["scale_factor"], base_config["database"], base_config["column_filters"])
-    parsing_workload_generator = WorkloadGenerator(base_config["workload"], spath=base_config["workload"]["path"], workload_columns=schema.columns, random_seed=0, database_name="", experiment_id="")
 
     for i, chunk_indices in enumerate(segmented_indices):
         chunk_number = i + 1
