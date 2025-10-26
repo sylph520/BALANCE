@@ -21,7 +21,7 @@ from index_selection_evaluation.selection.workload import Workload
 use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
 
 def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0,
-                          test_workload='', test_workload_qids='', newf=False,
+                          test_workload_from_file='', test_workload_qids='', newf=False,
                           input_workload: Workload=None, random_seed=0):
     CONFIGURATION_FILE = configuration_file
     np.random.seed(random_seed)
@@ -54,8 +54,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 model = experiment.model_type.load(model_path)
                 experiment.set_model(model)
 
-                if test_workload:
-                    logging.info(f"Using custom test workload from file: {test_workload}")
+                if test_workload_from_file:
+                    logging.info(f"Using custom test workload from file: {test_workload_from_file}")
                     query_ids = None
                     if test_workload_qids:
                         try:
@@ -63,7 +63,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                         except ValueError:
                             logging.error("Invalid format for --test_workload_qids. Please provide a comma-separated list of integers.")
                             exit(1)
-                    test_wl = experiment.workload_from_sql_file(test_workload, selection_qids=query_ids)
+                    test_wl = experiment.workload_from_sql_file(test_workload_from_file, selection_qids=query_ids)
                     if fix_index_count > 0:
                         test_wl.budget = fix_index_count
                     test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
@@ -279,5 +279,5 @@ if __name__ == "__main__":
 
     run_single_experiment(config_file, test_only=args.test_only, uni_freq=args.uni_freq,\
                             fix_index_count=args.fix_index_count, ts=args.ts,
-                            test_workload=args.test_workload, test_workload_qids = args.test_workload_qids, newf=args.newf)
+                            test_workload_from_file=args.test_workload, test_workload_qids = args.test_workload_qids, newf=args.newf)
 
