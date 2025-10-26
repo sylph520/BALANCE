@@ -1,34 +1,35 @@
+import os
 import copy
-import importlib
 import logging
 import pickle
-import sys
-import gym_db  # noqa: F401
 from gym_db.common import EnvironmentType
 from balance.experiment import Experiment
 import argparse
-import os
 import datetime
+import tensorflow as tf
+import numpy as np
+
+import random
+import importlib
+import gym
+import json
+import sys
+
+import gym_db  # noqa: F401
 from index_selection_evaluation.selection.workload import Workload
 
-# For full determinism, set hash seed and seed random libraries at the start.
-os.environ['PYTHONHASHSEED'] = '0'
-import numpy as np
-np.random.seed(0)
-import random
-random.seed(0)
+use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
 
-
-use_gpu = "0"
-os.environ["CUDA_VISIBLE_DEVICES"] = use_gpu
-
-def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0, test_workload='', test_workload_qids='', newf=False,
-                          input_workload: Workload=None):
+def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0,
+                          test_workload='', test_workload_qids='', newf=False,
+                          input_workload: Workload=None, random_seed=0):
     CONFIGURATION_FILE = configuration_file
+    np.random.seed(random_seed)
+    random.seed(random_seed)
 
     logging.warning("use gpu:" + use_gpu)
     if test_only:
-        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, newf=newf)
+        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, newf=newf, random_seed=random_seed)
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
@@ -113,7 +114,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         else:
             logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
     else:
-        experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts)
+        experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, random_seed=random_seed)
 
         if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
             from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
@@ -268,6 +269,7 @@ if __name__ == "__main__":
     parser.add_argument('--test_workload', type=str, help='Path to a .sql file to use as a custom test workload.')
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
     parser.add_argument('--newf', action='store_true', default=False)
+    parser.add_argument('--random_seed', type=int, default=0)
     args = parser.parse_args()
 
     if args.config:

@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--ts', type=int, default=0)
     parser.add_argument('--newf', action='store_true', default=False)
     parser.add_argument('--uniComp', action='store_true', default=False)
+    parser.add_argument('--random_seed', type=int, default=0, help='Set a random seed for reproducibility')
     args = parser.parse_args()
 
     benchmark = args.bm
@@ -50,6 +51,10 @@ def main():
 
     with open(base_config_path, 'r') as f:
         base_config = json.load(f)
+
+    # Override config with command-line seed if provided
+    if args.random_seed is not None:
+        base_config["random_seed"] = args.random_seed
 
     if args.ts:
         base_config['timesteps'] = args.ts
@@ -124,7 +129,7 @@ def main():
     # os._exit(0)
 
     schema = Schema(base_config["workload"]["benchmark"], base_config["workload"]["scale_factor"], base_config["database"], base_config["column_filters"])
-    parsing_workload_generator = WorkloadGenerator(base_config["workload"], spath=base_config["workload"]["path"], workload_columns=schema.columns, random_seed=0,
+    parsing_workload_generator = WorkloadGenerator(base_config["workload"], spath=base_config["workload"]["path"], workload_columns=schema.columns, random_seed=args.random_seed,
                                      database_name=dbname, experiment_id="", tpl2tid=tpl2tid)
 
     # We need the template IDs (the query text) for the segmentation logic
@@ -164,7 +169,7 @@ def main():
                 json.dump(config, f, indent=4)
             res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'],
                         uni_freq=freq_label, fix_index_count=config['fix_index_count'], newf=args.newf,
-                        input_workload=w)
+                        input_workload=w, random_seed=args.random_seed)
             logging.info("trained a model")
 
             # b. Update the source model path for the next iteration

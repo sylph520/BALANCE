@@ -34,7 +34,7 @@ class DummyWorkloadGenerator:
         self.number_of_query_classes = number_of_query_classes
 
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0, lsi_dimension=None, newf=False):
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0, lsi_dimension=None, newf=False, random_seed=None):
         """
         setup the experiment from configuration, random seed, and related method info
         """
@@ -43,6 +43,7 @@ class Experiment(object):
 
         cp = ConfigurationParser(configuration_file)
         self.config = cp.config
+        self.config['random_seed'] = random_seed
         self.fix_index_count = fix_index_count
         if uni_freq:
             self.config['workload']['varying_frequencies'] = False

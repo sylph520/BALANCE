@@ -230,6 +230,8 @@ class WorkloadGenerator(object):
                             config["training_instances"], validation_instances, test_instances, config["size"]
                     )
             else:
+                workload_class_order, _ = self._generate_random_workload(config["size"])
+                input_workload.queries =  [input_workload.queries[workload_class_order[i]-1] for i in  range(config['size'])]
                 self.wl_training = [input_workload]
                 self.wl_validation = [[input_workload]]
                 self.wl_testing = [[input_workload]]
