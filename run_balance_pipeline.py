@@ -4,9 +4,11 @@ import os
 import pickle
 import copy
 import argparse
+from typing import List, Set
+
 from main import run_single_experiment
 from balance.workload_stream_generator import generate_workload_chunk_stream, read_queries
-from balance.chunk_segmenter import segment_workloads
+from balance.chunk_segmenter import segment_workloads, workload_fits_chunk
 from index_selection_evaluation.selection.workload import Workload, Query
 from balance.schema import Schema
 from balance.workload_generator import WorkloadGenerator
@@ -14,10 +16,12 @@ from balance.query_hasher import query_to_hash
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def convert_dict_to_workload(workload_dict, workload_generator):
+def convert_dict_to_workload(workload_dict, workload_generator, unify_similar_ops=False):
     queries = []
-    for i, (text, freq) in enumerate(workload_dict.items()):
-        query = Query(i, text, freq)
+    for _, (text, freq) in enumerate(workload_dict.items()):
+        _, tpl = query_to_hash(text, unify_similar_ops=unify_similar_ops, dbname=workload_generator.database_name)
+        tid = workload_generator.tpl2tid[tpl]
+        query = Query(tid, text, freq)
         query.columns = []
         workload_generator._store_indexable_columns(query)
         queries.append(query)
@@ -50,10 +54,9 @@ def main():
     if args.ts:
         base_config['timesteps'] = args.ts
 
-    schema = Schema(base_config["workload"]["benchmark"], base_config["workload"]["scale_factor"], base_config["database"], base_config["column_filters"])
-    parsing_workload_generator = WorkloadGenerator(base_config["workload"], spath=base_config["workload"]["path"], workload_columns=schema.columns, random_seed=0, database_name="", experiment_id="")
 
     hash2tid = {}
+    tpl2tid = {}
     if args.mode == 'batch':  # -> List[Dict[str, int]]
         # Generate 4 varied sets of 300 workloads each
         total_templates = {}
@@ -95,10 +98,6 @@ def main():
 
     i = 1
     tpl_stream = []
-    use_ast= True
-    schema_dict = {}
-    for t in schema.tables:
-        schema_dict[t.name] = [c.name for c  in t.columns]
 
     dbname = ''
     if benchmark in ['tpch', 'tpchc']:
@@ -116,6 +115,7 @@ def main():
             q_tpl_hash, tpl = query_to_hash(qstr, unify_similar_ops=args.uniComp, dbname=dbname)
             tpl_stream.append(tpl)
             if q_tpl_hash not in hash2tid:
+                tpl2tid[tpl] = i
                 hash2tid[q_tpl_hash] = i
                 i += 1
 
@@ -123,60 +123,49 @@ def main():
     #     pickle.dump(flat_workload_stream_dicts, f)
     # os._exit(0)
 
+    schema = Schema(base_config["workload"]["benchmark"], base_config["workload"]["scale_factor"], base_config["database"], base_config["column_filters"])
+    parsing_workload_generator = WorkloadGenerator(base_config["workload"], spath=base_config["workload"]["path"], workload_columns=schema.columns, random_seed=0,
+                                     database_name=dbname, experiment_id="", tpl2tid=tpl2tid)
+
     # We need the template IDs (the query text) for the segmentation logic
-    workload_stream_for_segmentation = [set(wl.keys()) for wl in flat_workload_stream_dicts]
-    logging.info(f"Successfully generated a flat stream of {len(workload_stream_for_segmentation)} workloads.")
+    workload_strset_stream = [set(wl.keys()) for wl in flat_workload_stream_dicts]
 
-    # --- Step 2: Segment the stream into chunks ---
+    logging.info(f"Successfully generated a flat stream of {len(workload_strset_stream)} workloads.")
+
     difference_threshold = 10 # As per the generator's substitution rate
-    logging.info(f"--- Step 2: Segmenting stream with a {difference_threshold}% threshold ---")
-    segmented_indices = segment_workloads(workload_stream_for_segmentation, difference_threshold, hash2tid, dbname=dbname)
+    # segmented_indices = segment_workloads(workload_strset_stream, difference_threshold, hash2tid, dbname=dbname)
+    chunks: List[List[Workload]] = []
 
-    logging.info(f"========== Segmentation Complete: Identified {len(segmented_indices)} Chunks ==========")
-
-    # --- Step 3: Process chunks sequentially with policy transfer ---
+    chunk_ptr = 0
     source_model_pool = []
+    config = copy.deepcopy(base_config)
 
-    for i, chunk_indices in enumerate(segmented_indices):
-        chunk_number = i + 1
-        logging.info(f"\n========== PROCESSING CHUNK {chunk_number} (Workloads {chunk_indices[0]} to {chunk_indices[-1]}) ==========")
+    if config.get('constraint_type', 'storage') == 'count':
+        config['fix_index_count'] = config['constraint_value']
+    else:
+        config['fix_index_count'] = config.get('fix_index_count', 0)
+    freq_label = 'varyFreq' if config['workload']['varying_frequencies'] else 'uniFreq'
 
-        # a. Get the workloads for the current chunk
-        chunk_workload_dicts = [flat_workload_stream_dicts[j] for j in chunk_indices]
-        chunk_workloads = [convert_dict_to_workload(wl, parsing_workload_generator) for wl in chunk_workload_dicts]
+    for wdict in flat_workload_stream_dicts:
+        w = convert_dict_to_workload(wdict, workload_generator=parsing_workload_generator, unify_similar_ops=args.uniComp)
+        w.budget = 3
+        if len(chunks) == 0 or (not workload_fits_chunk(chunks[-1], w, difference_threshold, hash2tid, dbname, args.uniComp)):  # train over the workload 
+            chunks.append([w])
+            # a. train a new model
+            if source_model_pool:   # if with source model, set the model to ppo2_BALANCE
+                logging.info(f"Enabling policy transfer for Chunk {chunk_ptr} from {len(source_model_pool)} source(s).")
+                config['source_model_paths'] = source_model_pool
+                config['rl_algorithm']['algorithm'] = 'ppo2_BALANCE'
 
-        # b. Prepare config
-        config = copy.deepcopy(base_config)
-        config['id'] = f"pipeline_chunk_{chunk_number}_query_var"
-        if config.get('constraint_type', 'storage') == 'count':
-            config['fix_index_count'] = config['constraint_value']
-        else:
-            config['fix_index_count'] = config.get('fix_index_count', 0)
+            chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
+            with open(chunk_config_path, 'w') as f:
+                json.dump(config, f, indent=4)
+            res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'],
+                        uni_freq=freq_label, fix_index_count=config['fix_index_count'], newf=args.newf,
+                        input_workload=w)
+            logging.info("trained a model")
 
-        workload_pickle_path = f"experiment_results/{args.mode}/{benchmark}_workloads_chunk_{chunk_number}.pkl"
-        os.makedirs(os.path.dirname(workload_pickle_path), exist_ok=True)
-        with open(workload_pickle_path, 'wb') as f:
-            pickle.dump(chunk_workloads, f)
-        config['load_workloads_from_file'] = workload_pickle_path
-
-        # c. Enable cumulative policy transfer
-        if source_model_pool:
-            logging.info(f"Enabling policy transfer for Chunk {chunk_number} from {len(source_model_pool)} source(s).")
-            config['source_model_paths'] = source_model_pool
-            config['rl_algorithm']['algorithm'] = 'ppo2_BALANCE'
-
-        # d. Save config and run training
-        chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_number}.json"
-        with open(chunk_config_path, 'w') as f:
-            json.dump(config, f, indent=4)
-
-        logging.info(f"Starting training for Chunk {chunk_number}...")
-        try:
-            freq_label = 'varyFreq' if config['workload']['varying_frequencies'] else 'uniFreq'
-            res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'], uni_freq=freq_label, fix_index_count=config['fix_index_count'], newf=args.newf)
-            logging.info(f"--- Training for Chunk {chunk_number} completed successfully. ---")
-
-            # g. Update the source model path for the next iteration
+            # b. Update the source model path for the next iteration
             exp_folder = f"experiment_results/ID_{config['id']}_{config['workload']['benchmark']}_ts{config['timesteps']}_{freq_label}"
             if config['fix_index_count'] > 0:
                 exp_folder += f"_idxmax{config['fix_index_count']}"
@@ -186,11 +175,73 @@ def main():
                 source_model_pool.append(new_model_path)
                 logging.info(f"Added new model to pool: {new_model_path}")
             else:
-                logging.error(f"Could not find trained model for Chunk {chunk_number} at {new_model_path}")
+                logging.error(f"Could not find trained model for Chunk {chunk_ptr} at {new_model_path}")
 
-        except Exception as e:
-            logging.error(f"Training for Chunk {chunk_number} FAILED: {e}", exc_info=True)
-            break
+            chunk_ptr = len(chunks) -1
+        else:  # just append and test over the current workload
+            chunks[-1].append(w)
+            chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
+            res_path = run_single_experiment(chunk_config_path, test_only=True, ts=config['timesteps'],
+                        uni_freq=freq_label, fix_index_count=config['fix_index_count'], newf=args.newf,
+                        input_workload=w)
+            print(f"test the model for new workload fits in the chunk {chunk_ptr}")
+
+
+
+    # # --- Step 3: Process chunks sequentially with policy transfer ---
+    # for i, chunk_indices in enumerate(segmented_indices):
+    #     chunk_number = i + 1
+    #     logging.info(f"\n========== PROCESSING CHUNK {chunk_number} (Workloads {chunk_indices[0]} to {chunk_indices[-1]}) ==========")
+
+    #     # a. Get the workloads for the current chunk
+    #     chunk_workload_dicts = [flat_workload_stream_dicts[j] for j in chunk_indices]
+    #     chunk_workloads = [convert_dict_to_workload(wl, parsing_workload_generator, unify_similar_ops=args.uniComp) for wl in chunk_workload_dicts]
+
+    #     # b. Prepare config
+    #     config = copy.deepcopy(base_config)
+    #     config['id'] = f"pipeline_chunk_{chunk_number}_query_var"
+    #     if config.get('constraint_type', 'storage') == 'count':
+    #         config['fix_index_count'] = config['constraint_value']
+    #     else:
+    #         config['fix_index_count'] = config.get('fix_index_count', 0)
+
+    #     workload_pickle_path = f"experiment_results/{args.mode}/{benchmark}_workloads_chunk_{chunk_number}.pkl"
+    #     os.makedirs(os.path.dirname(workload_pickle_path), exist_ok=True)
+    #     with open(workload_pickle_path, 'wb') as f:
+    #         pickle.dump(chunk_workloads, f)
+    #     config['load_workloads_from_file'] = workload_pickle_path
+
+    #     # c. Enable cumulative policy transfer
+    #     if source_model_pool:
+    #         logging.info(f"Enabling policy transfer for Chunk {chunk_number} from {len(source_model_pool)} source(s).")
+    #         config['source_model_paths'] = source_model_pool
+    #         config['rl_algorithm']['algorithm'] = 'ppo2_BALANCE'
+
+    #     # d. Save config and run training
+    #     chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_number}.json"
+    #     with open(chunk_config_path, 'w') as f:
+    #         json.dump(config, f, indent=4)
+
+    #     logging.info(f"Starting training for Chunk {chunk_number}...")
+
+    #     logging.info(f"Training for the first workload in chunk {chunk_number}...")
+    #     freq_label = 'varyFreq' if config['workload']['varying_frequencies'] else 'uniFreq'
+    #     res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'], uni_freq=freq_label,\
+    #                 fix_index_count=config['fix_index_count'], newf=args.newf,\
+    #                 worklaod_queries=chunk_workloads[0])
+    #     logging.info(f"--- Training for Chunk {chunk_number} completed successfully. ---")
+
+    #     # g. Update the source model path for the next iteration
+    #     exp_folder = f"experiment_results/ID_{config['id']}_{config['workload']['benchmark']}_ts{config['timesteps']}_{freq_label}"
+    #     if config['fix_index_count'] > 0:
+    #         exp_folder += f"_idxmax{config['fix_index_count']}"
+    #     new_model_path = os.path.join(exp_folder, "final_model.zip")
+    #     assert res_path == exp_folder
+    #     if os.path.exists(new_model_path):
+    #         source_model_pool.append(new_model_path)
+    #         logging.info(f"Added new model to pool: {new_model_path}")
+    #     else:
+    #         logging.error(f"Could not find trained model for Chunk {chunk_number} at {new_model_path}")
 
     logging.info("##### BALANCE Pipeline Finished #####")
 

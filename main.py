@@ -8,6 +8,8 @@ from gym_db.common import EnvironmentType
 from balance.experiment import Experiment
 import argparse
 import os
+import datetime
+from index_selection_evaluation.selection.workload import Workload
 
 # For full determinism, set hash seed and seed random libraries at the start.
 os.environ['PYTHONHASHSEED'] = '0'
@@ -20,7 +22,8 @@ random.seed(0)
 use_gpu = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = use_gpu
 
-def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0, test_workload='', test_workload_qids='', newf=False):
+def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0, test_workload='', test_workload_qids='', newf=False,
+                          input_workload: Workload=None):
     CONFIGURATION_FILE = configuration_file
 
     logging.warning("use gpu:" + use_gpu)
@@ -29,7 +32,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
-        experiment.prepare()
+        experiment.prepare(input_workload)
+        input_qids = [q.nr  for q in input_workload.queries]
         experiment_base_name = experiment.id
         folder_path = experiment.experiment_folder_path
 
@@ -45,7 +49,9 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 else:
                     raise ValueError
 
+                experiment.start_learning()
                 model = experiment.model_type.load(model_path)
+                experiment.set_model(model)
 
                 if test_workload:
                     logging.info(f"Using custom test workload from file: {test_workload}")
@@ -67,7 +73,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                         if not uni_freq:
                             test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
                         else:
-                            test_wl = experiment.workload_generator._workloads_from_tuples([tuple(([20, 5, 17, 2, 4, 19, 3, 1, 10, 16, 15, 11, 12, 13, 18, 6, 14, 7, 9, 8], [1]*20))])[0]
+                            test_wl = experiment.workload_generator._workloads_from_tuples([tuple((input_qids, [1]*20))])[0]
                         test_wl.budget = 3
                         test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
                     else:
@@ -98,7 +104,10 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 episode_performances = experiment._evaluate_model(model, test_env, n_eval_episodes)
                 logging.info(f"Evaluation completed. Performance: {episode_performances}")
                 print(f"Mean performance: {episode_performances[1]:.2f}")
-                exit(0)
+                experiment.training_end_time = datetime.datetime.now()
+                experiment.finishmy()
+                return experiment.experiment_folder_path
+                # exit(0)
             else:
                 logging.warning(f"No saved model found at {model_path}, proceeding with training")
         else:
@@ -106,146 +115,146 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
     else:
         experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts)
 
-    if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
-        from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
-        from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
-        from stable_baselines.ppo2 import ppo2, ppo2_BALANCE
-        source_algorithm_class = ppo2.PPO2
-        if experiment.config['rl_algorithm']['algorithm'] == 'PPO2':
-            algorithm_class = ppo2.PPO2
-        elif experiment.config['rl_algorithm']['algorithm'] == 'ppo2_BALANCE':
-            algorithm_class = ppo2_BALANCE.PPO2
+        if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
+            from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
+            from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
+            from stable_baselines.ppo2 import ppo2, ppo2_BALANCE
+            source_algorithm_class = ppo2.PPO2
+            if experiment.config['rl_algorithm']['algorithm'] == 'PPO2':
+                algorithm_class = ppo2.PPO2
+            elif experiment.config['rl_algorithm']['algorithm'] == 'ppo2_BALANCE':
+                algorithm_class = ppo2_BALANCE.PPO2
+            else:
+                raise ValueError(f"unknown algorithm type {experiment.config['rl_algorithm']['algorihtm']}")
         else:
-            raise ValueError(f"unknown algorithm type {experiment.config['rl_algorithm']['algorihtm']}")
-    else:
-        raise ValueError
+            raise ValueError
 
-    experiment.prepare()
-    with open(f"{experiment.experiment_folder_path}/experiment_object.pickle", "wb") as handle:
-        pickle.dump(experiment, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    ParallelEnv = SubprocVecEnv if experiment.config["parallel_environments"] > 1 else DummyVecEnv
+        experiment.prepare(input_workload)
+        with open(f"{experiment.experiment_folder_path}/experiment_object.pickle", "wb") as handle:
+            pickle.dump(experiment, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        ParallelEnv = SubprocVecEnv if experiment.config["parallel_environments"] > 1 else DummyVecEnv
 
-    training_env = ParallelEnv(
-        [experiment.make_env(env_id) for env_id in range(experiment.config["parallel_environments"])]
-    )
-    training_env = VecNormalize(
-        training_env, norm_obs=True, norm_reward=True, gamma=experiment.config["rl_algorithm"]["gamma"], training=True
-    )
-    temac = []
-
-    experiment.source_model_type = source_algorithm_class
-    experiment.model_type = algorithm_class
-
-    if len(experiment.model_pool) > 0:
-        logging.info(f"Policy transfer enabled. Loading {len(experiment.model_pool)} source models.")
-        for model_path in experiment.model_pool:
-            temac.append(experiment.source_model_type.load(model_path))
-
-        model: ppo2_BALANCE.PPO2 = algorithm_class(
-            policy=experiment.config["rl_algorithm"]["policy"],
-            env=training_env,
-            verbose=2,
-            seed=experiment.config["random_seed"],
-            gamma=experiment.config["rl_algorithm"]["gamma"],
-            tensorboard_log="tensor_log",
-            acc=temac,
-            policy_kwargs=copy.copy(
-                experiment.config["rl_algorithm"]["model_architecture"]
-            ),  # This is necessary because SB modifies the passed dict.
-            **experiment.config["rl_algorithm"]["args"],
+        training_env = ParallelEnv(
+            [experiment.make_env(env_id) for env_id in range(experiment.config["parallel_environments"])]
         )
-    else:
-        model: ppo2.PPO2 = ppo2.PPO2(
-            policy=experiment.config["rl_algorithm"]["policy"],
-            env=training_env,
-            verbose=2,
-            seed=experiment.config["random_seed"],
-            gamma=experiment.config["rl_algorithm"]["gamma"],
-            tensorboard_log="tensor_log",
-            policy_kwargs=copy.copy(
-                experiment.config["rl_algorithm"]["model_architecture"]
-            ),  # This is necessary because SB modifies the passed dict.
-            **experiment.config["rl_algorithm"]["args"],
+        training_env = VecNormalize(
+            training_env, norm_obs=True, norm_reward=True, gamma=experiment.config["rl_algorithm"]["gamma"], training=True
+        )
+        temac = []
+
+        experiment.source_model_type = source_algorithm_class
+        experiment.model_type = algorithm_class
+
+        if len(experiment.model_pool) > 0:
+            logging.info(f"Policy transfer enabled. Loading {len(experiment.model_pool)} source models.")
+            for model_path in experiment.model_pool:
+                temac.append(experiment.source_model_type.load(model_path))
+
+            model: ppo2_BALANCE.PPO2 = algorithm_class(
+                policy=experiment.config["rl_algorithm"]["policy"],
+                env=training_env,
+                verbose=2,
+                seed=experiment.config["random_seed"],
+                gamma=experiment.config["rl_algorithm"]["gamma"],
+                tensorboard_log="tensor_log",
+                acc=temac,
+                policy_kwargs=copy.copy(
+                    experiment.config["rl_algorithm"]["model_architecture"]
+                ),  # This is necessary because SB modifies the passed dict.
+                **experiment.config["rl_algorithm"]["args"],
             )
-    logging.warning(f"Creating model with NN architecture: {experiment.config['rl_algorithm']['model_architecture']}")
+        else:
+            model: ppo2.PPO2 = ppo2.PPO2(
+                policy=experiment.config["rl_algorithm"]["policy"],
+                env=training_env,
+                verbose=2,
+                seed=experiment.config["random_seed"],
+                gamma=experiment.config["rl_algorithm"]["gamma"],
+                tensorboard_log="tensor_log",
+                policy_kwargs=copy.copy(
+                    experiment.config["rl_algorithm"]["model_architecture"]
+                ),  # This is necessary because SB modifies the passed dict.
+                **experiment.config["rl_algorithm"]["args"],
+                )
+        logging.warning(f"Creating model with NN architecture: {experiment.config['rl_algorithm']['model_architecture']}")
 
-    experiment.set_model(model)
+        experiment.set_model(model)
 
-    callback_test_env = VecNormalize(
-        DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)]),
-        norm_obs=True,
-        norm_reward=False,
-        gamma=experiment.config["rl_algorithm"]["gamma"],
-        training=False,
-    )
-    test_callback = EvalCallbackWithTBRunningAverage(
-        n_eval_episodes=experiment.config["workload"]["validation_testing"]["number_of_workloads"],
-        eval_freq=round(experiment.config["validation_frequency"] / experiment.config["parallel_environments"]),
-        eval_env=callback_test_env,
-        verbose=1,
-        name="test",
-        deterministic=True,
-        comparison_performances=experiment.comparison_performances["test"],
-    )
-
-    callback_validation_env = VecNormalize(
-        DummyVecEnv([experiment.make_env(0, EnvironmentType.VALIDATION)]),
-        norm_obs=True,
-        norm_reward=False,
-        gamma=experiment.config["rl_algorithm"]["gamma"],
-        training=False,
-    )
-    validation_callback = EvalCallbackWithTBRunningAverage(
-        n_eval_episodes=experiment.config["workload"]["validation_testing"]["number_of_workloads"],
-        eval_freq=round(experiment.config["validation_frequency"] / experiment.config["parallel_environments"]),
-        eval_env=callback_validation_env,
-        best_model_save_path=experiment.experiment_folder_path,
-        verbose=1,
-        name="validation",
-        deterministic=True,
-        comparison_performances=experiment.comparison_performances["validation"],
-    )
-    callbacks = [validation_callback, test_callback]
-
-    if len(experiment.multi_validation_wl) > 0:
-        callback_multi_validation_env = VecNormalize(
-            DummyVecEnv([experiment.make_env(0, EnvironmentType.VALIDATION, experiment.multi_validation_wl)]),
+        callback_test_env = VecNormalize(
+            DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)]),
             norm_obs=True,
             norm_reward=False,
             gamma=experiment.config["rl_algorithm"]["gamma"],
             training=False,
         )
-        multi_validation_callback = EvalCallbackWithTBRunningAverage(
-            n_eval_episodes=len(experiment.multi_validation_wl),
+        test_callback = EvalCallbackWithTBRunningAverage(
+            n_eval_episodes=experiment.config["workload"]["validation_testing"]["number_of_workloads"],
             eval_freq=round(experiment.config["validation_frequency"] / experiment.config["parallel_environments"]),
-            eval_env=callback_multi_validation_env,
+            eval_env=callback_test_env,
+            verbose=1,
+            name="test",
+            deterministic=True,
+            comparison_performances=experiment.comparison_performances["test"],
+        )
+
+        callback_validation_env = VecNormalize(
+            DummyVecEnv([experiment.make_env(0, EnvironmentType.VALIDATION)]),
+            norm_obs=True,
+            norm_reward=False,
+            gamma=experiment.config["rl_algorithm"]["gamma"],
+            training=False,
+        )
+        validation_callback = EvalCallbackWithTBRunningAverage(
+            n_eval_episodes=experiment.config["workload"]["validation_testing"]["number_of_workloads"],
+            eval_freq=round(experiment.config["validation_frequency"] / experiment.config["parallel_environments"]),
+            eval_env=callback_validation_env,
             best_model_save_path=experiment.experiment_folder_path,
             verbose=1,
-            name="multi_validation",
+            name="validation",
             deterministic=True,
-            comparison_performances={},
+            comparison_performances=experiment.comparison_performances["validation"],
         )
-        callbacks.append(multi_validation_callback)
+        callbacks = [validation_callback, test_callback]
 
-    experiment.start_learning()
-    tb_log_name = 'tblog_'+experiment.experiment_folder_path.split('/')[-1]
+        if len(experiment.multi_validation_wl) > 0:
+            callback_multi_validation_env = VecNormalize(
+                DummyVecEnv([experiment.make_env(0, EnvironmentType.VALIDATION, experiment.multi_validation_wl)]),
+                norm_obs=True,
+                norm_reward=False,
+                gamma=experiment.config["rl_algorithm"]["gamma"],
+                training=False,
+            )
+            multi_validation_callback = EvalCallbackWithTBRunningAverage(
+                n_eval_episodes=len(experiment.multi_validation_wl),
+                eval_freq=round(experiment.config["validation_frequency"] / experiment.config["parallel_environments"]),
+                eval_env=callback_multi_validation_env,
+                best_model_save_path=experiment.experiment_folder_path,
+                verbose=1,
+                name="multi_validation",
+                deterministic=True,
+                comparison_performances={},
+            )
+            callbacks.append(multi_validation_callback)
 
-    model.learn(
-        total_timesteps=experiment.config["timesteps"],
-        callback=callbacks,
-        tb_log_name=tb_log_name, ids=experiment.config["id"]
-    )
-    experiment.finish_learning(
-        training_env,
-        validation_callback.moving_average_step * experiment.config["parallel_environments"],
-        validation_callback.best_model_step * experiment.config["parallel_environments"],
-    )
+        experiment.start_learning()
+        tb_log_name = 'tblog_'+experiment.experiment_folder_path.split('/')[-1]
 
-    with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
-        pickle.dump([training_env.venv.envs[0].dic, callbacks[0].eval_env.venv.envs[0].dic, callbacks[1].eval_env.venv.envs[0].dic], handle, protocol=pickle.HIGHEST_PROTOCOL)
-    experiment.finishmy()
+        model.learn(
+            total_timesteps=experiment.config["timesteps"],
+            callback=callbacks,
+            tb_log_name=tb_log_name, ids=experiment.config["id"]
+        )
+        experiment.finish_learning(
+            training_env,
+            validation_callback.moving_average_step * experiment.config["parallel_environments"],
+            validation_callback.best_model_step * experiment.config["parallel_environments"],
+        )
 
-    return experiment.experiment_folder_path
+        with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
+            pickle.dump([training_env.venv.envs[0].dic, callbacks[0].eval_env.venv.envs[0].dic, callbacks[1].eval_env.venv.envs[0].dic], handle, protocol=pickle.HIGHEST_PROTOCOL)
+        experiment.finishmy()
+
+        return experiment.experiment_folder_path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

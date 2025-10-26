@@ -23,15 +23,19 @@ QUERY_PATH = "query_files"
 
 class WorkloadGenerator(object):
     def __init__(
-        self, config, workload_columns, random_seed, database_name, experiment_id=None, filter_utilized_columns=None,experiment_folder_path=None,spath=None
+        self, config, workload_columns, random_seed, database_name, experiment_id=None,
+        filter_utilized_columns=None,experiment_folder_path=None,spath=None,
+        tpl2tid={},
+        input_workload=None
     ):
-        assert config["benchmark"] in [
+        self.benchmark = config["benchmark"]
+        assert self.benchmark  in [
             "TPCH",
             "TPCDS",
             "JOB",
             "TPCHC",
             "TPCDSC",
-        ], f"Benchmark '{config['benchmark']}' is currently not supported."
+        ], f"Benchmark '{self.benchmark}' is currently not supported."
 
         # For create view statement differentiation
         self.experiment_id = experiment_id
@@ -46,22 +50,25 @@ class WorkloadGenerator(object):
 
         self.workload_columns = workload_columns
         self.database_name = database_name
+        self.tpl2tid = tpl2tid
 
-        self.benchmark = config["benchmark"]
         self.number_of_query_classes = self._set_number_of_query_classes()
         self.excluded_query_classes = set(config["excluded_query_classes"])
         self.varying_frequencies = config["varying_frequencies"]
+        validation_instances = config["validation_testing"]["number_of_workloads"]
+        test_instances = config["validation_testing"]["number_of_workloads"]
 
         # self.query_texts is list of lists. Outer list for query classes, inner list for instances of this class.
         #self.query_texts = self._retrieve_query_texts()
-        self.query_texts = self._retrieve_query_texts_random_value()
+        if not input_workload:
+            self.query_texts = self._retrieve_query_texts_random_value()
+        else:
+            self.query_texts = [[q.text] for q in input_workload.queries]
         self.query_classes = set(range(1, self.number_of_query_classes + 1))
         self.available_query_classes = self.query_classes - self.excluded_query_classes
 
         self.globally_indexable_columns = self._select_indexable_columns(self.filter_utilized_columns)
 
-        validation_instances = config["validation_testing"]["number_of_workloads"]
-        test_instances = config["validation_testing"]["number_of_workloads"]
         self.wl_validation = []
         self.wl_testing = []
 
@@ -218,11 +225,16 @@ class WorkloadGenerator(object):
         else:
             self.wl_validation = [None]
             self.wl_testing = [None]
-            self.wl_training, self.wl_validation[0], self.wl_testing[0] = self._generate_workloads(
-                config["training_instances"], validation_instances, test_instances, config["size"]
-            )
+            if not input_workload:
+                self.wl_training, self.wl_validation[0], self.wl_testing[0] = self._generate_workloads(
+                            config["training_instances"], validation_instances, test_instances, config["size"]
+                    )
+            else:
+                self.wl_training = [input_workload]
+                self.wl_validation = [[input_workload]]
+                self.wl_testing = [[input_workload]]
 
-        logging.critical(f"Sample training workloads: {self.rnd.sample(self.wl_training, 1)}")
+        # logging.critical(f"Sample training workloads: {self.rnd.sample(self.wl_training, 1)}")
         logging.info("Finished generating workloads.")
 
 
@@ -233,7 +245,7 @@ class WorkloadGenerator(object):
             for file_number in range(1, self.number_of_query_classes + 1)
         ]
 
-        finished_queries = []
+        finished_queries: List[str] = []
         for query_file in query_files:
 
             queries = query_file.readlines()
@@ -243,7 +255,7 @@ class WorkloadGenerator(object):
                 now_q = self._preprocess_queries(now_q)
                 qq.append(now_q)
             finished_queries.append(qq)
-            
+
             query_file.close()
 
         assert len(finished_queries) == self.number_of_query_classes
@@ -283,7 +295,7 @@ class WorkloadGenerator(object):
 
         return finished_queries
 
-    def _preprocess_queries(self, queries):
+    def _preprocess_queries(self, queries) -> List[str]:
         """
         remove limit clauses?
         and create view with exp unique name
@@ -340,7 +352,7 @@ class WorkloadGenerator(object):
 
             for query_class, frequency in zip(query_classes, query_class_frequencies):
                 query_text = self.rnd.choice(self.query_texts[query_class - 1])
-                if isinstance(query_text,list):
+                if not isinstance(query_text,  str) and isinstance(query_text, list):
                     query_text = query_text[0]
 
                 query = Query(query_class, query_text, frequency=frequency)
@@ -365,7 +377,7 @@ class WorkloadGenerator(object):
     ):
         required_unique_workloads = train_instances + validation_instances + test_instances
 
-        
+
 
         unique_workload_tuples = set()
         # sample *required_unique_workloads* number of workloads
@@ -409,7 +421,7 @@ class WorkloadGenerator(object):
 
             latest_200_samples = wl1[-200:]
             latest_250_to_200_samples = wl1[-250:-200]
-        
+
             train_workloads=[]
             test_workloads=[]
             validation_workloads=[]
@@ -506,7 +518,7 @@ class WorkloadGenerator(object):
             else:
                 workload_query_classes = tuple(self.rnd.sample(self.available_query_classes, size))
                 self.temp_genone.append(workload_query_classes)
-            self.gen_one = self.gen_one +1 
+            self.gen_one = self.gen_one +1
 
         # Create frequencies
         if self.varying_frequencies:

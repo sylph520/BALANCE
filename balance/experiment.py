@@ -129,7 +129,7 @@ class Experiment(object):
         return Workload(final_queries, description=f"Custom workload from {os.path.basename(filepath)}")
 
 
-    def prepare(self):
+    def prepare(self, input_workload=None):
         """
         setup self.schema, self.workload_generator (for training, validation and testing),
         experiment budgets (randomly selected from fixed lists),
@@ -145,7 +145,7 @@ class Experiment(object):
         # if self.config.get("load_workloads_from_file"):
             with open(self.config["load_workloads_from_file"], "rb") as f:
                 chunk_workloads = pickle.load(f)
-            
+
             query_texts = [[q.text] for q in chunk_workloads[0].queries]
             self.workload_generator = DummyWorkloadGenerator(
                 training=chunk_workloads[:20],
@@ -158,12 +158,14 @@ class Experiment(object):
             logging.info(f"Loaded workloads from {self.config['load_workloads_from_file']}")
         else:
             self.workload_generator = WorkloadGenerator(
-                self.config["workload"],spath =  self.config["workload"]["path"],
+                self.config["workload"], spath=self.config["workload"]["path"],
                 workload_columns=self.schema.columns,
                 random_seed=self.config["random_seed"],
                 database_name=self.schema.database_name,
                 experiment_id=self.id,
-                filter_utilized_columns=self.config["filter_utilized_columns"],experiment_folder_path =self.experiment_folder_path
+                filter_utilized_columns=self.config["filter_utilized_columns"],
+                experiment_folder_path =self.experiment_folder_path,
+                input_workload = input_workload
             )
         self._assign_budgets_to_workloads()
         self._pickle_workloads()
@@ -243,7 +245,7 @@ class Experiment(object):
 
         with open(f"{self.experiment_folder_path}/validation_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_validation, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        
+
         with open(f"{self.experiment_folder_path}/train_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_training, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -253,12 +255,13 @@ class Experiment(object):
         self.model.training = False
         self.model.env.norm_reward = False
         self.model.env.training = False
-        
+
         self.schema.database_name = self.config["database"]
 
-        test_wl = self.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
-        test_wl.budget = 3
-        self.test_fm = self.test_model(self.model, wl_testing=[[test_wl]])[0]
+        # test_wl = self.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
+        # test_wl.budget = 3
+        # self.test_fm = self.test_model(self.model, wl_testing=[[test_wl]])[0]
+        self.test_fm = self.test_model(self.model)[0]
         self.vali_fm = self.validate_model(self.model)[0]
 
         self.moving_average_model = self.model_type.load(f"{self.experiment_folder_path}/moving_average_model.zip")
@@ -297,14 +300,14 @@ class Experiment(object):
             self.test_bm_mv = self.test_model(self.best_mean_reward_model_mv)[0]
             self.vali_bm_mv = self.validate_model(self.best_mean_reward_model_mv)[0]
 
-        self._write_report( self.config["database"])
+        # self._write_report( self.config["database"])
 
-        logging.critical(
-            (
-                f"Finished training of ID {self.id}. Report can be found at "
-                f"./{self.experiment_folder_path}/report_ID_{self.id}.txt"
-            )
-        )
+        # logging.critical(
+        #     (
+        #         f"Finished training of ID {self.id}. Report can be found at "
+        #         f"./{self.experiment_folder_path}/report_ID_{self.id}.txt"
+        #     )
+        # )
 
     def _get_wl_budgets_from_model_perfs(self, perfs):
         wl_budgets = []
@@ -370,7 +373,7 @@ class Experiment(object):
     def _create_experiment_folder(self):
         assert os.path.isdir(
             self.EXPERIMENT_RESULT_PATH
-        ), f"Folder for experiment results should exist at: ./{self.EXPERIMENT_RESULT_PATH}"
+        ), f"Folder for experiment results should exist at: ./"
 
         # __import__('ipdb').set_trace()
         # self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}"
@@ -407,8 +410,8 @@ class Experiment(object):
             f.write(f"Start Training:                {self.training_start_time}\n")
             f.write(f"End Training:                  {self.training_end_time}\n")
             f.write(f"Duration Training:             {self.training_end_time - self.training_start_time}\n")
-            f.write(f"Moving Average model at step:  {self.moving_average_validation_model_at_step}\n")
-            f.write(f"Mean reward model at step:     {self.best_mean_model_step}\n")
+            # f.write(f"Moving Average model at step:  {self.moving_average_validation_model_at_step}\n")
+            # f.write(f"Mean reward model at step:     {self.best_mean_model_step}\n")
             f.write(f"Git Hash:                      {subprocess.check_output(['git', 'rev-parse', 'HEAD'])}\n")
             f.write(f"Number of features:            {self.number_of_features}\n")
             f.write(f"Number of actions:             {self.number_of_actions}\n")
@@ -610,7 +613,7 @@ class Experiment(object):
             )
             f.write("\n")
             f.write("\n")
-            f.write(f"Evaluated episodes:            {self.evaluated_episodes}\n")
+            # f.write(f"Evaluated episodes:            {self.evaluated_episodes}\n")
             f.write(f"Total steps taken:             {self.total_steps_taken}\n")
             f.write(
                 (
@@ -880,7 +883,7 @@ class Experiment(object):
 
         return _init
 
- 
+
 
     def _set_sb_version_specific_methods(self):
         if self.config["rl_algorithm"]["stable_baselines_version"] == 2:

@@ -130,7 +130,7 @@ def get_value_rep(condition_op, relation_name, index_name, parameters):
             relation_name = left_value.split('.')[0]
 
         if relation_name not in parameters.tables_id:
-            return None
+            raise ValueError(f"relation {relation_name} not found!")
         else:
             if re.match(r'^[a-z][a-zA-Z0-9_]*\.[a-z][a-zA-Z0-9_]*$', right_value) is not None \
                     and right_value.split('.')[0] in parameters.tables_id:
