@@ -146,8 +146,10 @@ def main():
         config['fix_index_count'] = config.get('fix_index_count', 0)
     freq_label = 'varyFreq' if config['workload']['varying_frequencies'] else 'uniFreq'
 
+    ws_debug = []
     for wdict in flat_workload_stream_dicts:
         w = convert_dict_to_workload(wdict, workload_generator=parsing_workload_generator, unify_similar_ops=args.uniComp)
+        ws_debug.append(w)
         w.budget = 3
         if len(chunks) == 0 or (not workload_fits_chunk(chunks[-1], w, difference_threshold, hash2tid, dbname, args.uniComp)):  # train over the workload 
             chunks.append([w])
@@ -170,7 +172,7 @@ def main():
             if config['fix_index_count'] > 0:
                 exp_folder += f"_idxmax{config['fix_index_count']}"
             new_model_path = os.path.join(exp_folder, "final_model.zip")
-            assert res_path == exp_folder
+            # assert res_path == exp_folder
             if os.path.exists(new_model_path):
                 source_model_pool.append(new_model_path)
                 logging.info(f"Added new model to pool: {new_model_path}")

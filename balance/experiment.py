@@ -69,12 +69,12 @@ class Experiment(object):
         self.dataset_size = None
         self.model = None
         self.model_pool = []
-        self.Smodel_1 = None
-        self.Smodel_2 = None
-        self.Smodel_3 = None
-        self.Smodel_4 = None
-        self.Smodel_5 = None
-        self.Smodel_6 = None
+        # self.Smodel_1 = None
+        # self.Smodel_2 = None
+        # self.Smodel_3 = None
+        # self.Smodel_4 = None
+        # self.Smodel_5 = None
+        # self.Smodel_6 = None
         self.rnd = random.Random()
         self.rnd.seed(self.config["random_seed"])
 

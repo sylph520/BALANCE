@@ -52,7 +52,7 @@ class WorkloadGenerator(object):
         self.database_name = database_name
         self.tpl2tid = tpl2tid
 
-        self.number_of_query_classes = self._set_number_of_query_classes()
+        self.number_of_query_classes = self._set_number_of_query_classes()  # set wrt benchmark
         self.excluded_query_classes = set(config["excluded_query_classes"])
         self.varying_frequencies = config["varying_frequencies"]
         validation_instances = config["validation_testing"]["number_of_workloads"]
@@ -67,7 +67,7 @@ class WorkloadGenerator(object):
         self.query_classes = set(range(1, self.number_of_query_classes + 1))
         self.available_query_classes = self.query_classes - self.excluded_query_classes
 
-        self.globally_indexable_columns = self._select_indexable_columns(self.filter_utilized_columns)
+        self.globally_indexable_columns = self._select_indexable_columns(self.filter_utilized_columns) # obtain indexable columns wrt self.query_texts
 
         self.wl_validation = []
         self.wl_testing = []
@@ -341,7 +341,7 @@ class WorkloadGenerator(object):
 
     def _workloads_from_tuples(self, tuples, unknown_query_probability=None) -> List[Workload]:
         """
-        generate workloads according to selected templates in *tuples*
+        generate workloads according to selected templates in *tuples* wrt self.query_texts
         """
         workloads = []
         unknown_query_probability = "" if unknown_query_probability is None else unknown_query_probability
