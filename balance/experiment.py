@@ -34,7 +34,7 @@ class DummyWorkloadGenerator:
         self.number_of_query_classes = number_of_query_classes
 
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0, lsi_dimension=None, newf=False, random_seed=None):
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0, lsi_dimension=None, newf=False, random_seed=None, debug_print=False, cli_disable_precedent_masking=None, cli_enable_precedent_masking=None):
         """
         setup the experiment from configuration, random seed, and related method info
         """
@@ -43,6 +43,19 @@ class Experiment(object):
 
         cp = ConfigurationParser(configuration_file)
         self.config = cp.config
+        self.config['debug_print'] = debug_print
+
+        # Get value from config file, default to True if not present
+        config_disable_precedent_masking = self.config.get('disable_precedent_masking', True)
+
+        # Handle disable_precedent_masking with CLI precedence
+        if cli_disable_precedent_masking is True:
+            self.config['disable_precedent_masking'] = True
+        elif cli_enable_precedent_masking is False:
+            self.config['disable_precedent_masking'] = False
+        else:
+            # If no CLI flag, use the value from the config file (which defaults to True)
+            self.config['disable_precedent_masking'] = config_disable_precedent_masking
         self.config['random_seed'] = random_seed
         self.fix_index_count = fix_index_count
         if fix_index_count:
@@ -202,7 +215,7 @@ class Experiment(object):
         logging.info(f"Feeding {len(self.globally_indexable_columns_flat)} candidates into the environments.")
 
         self.action_storage_consumptions = utils.predict_index_sizes(
-            self.globally_indexable_columns_flat, self.schema.database_name
+            self.globally_indexable_columns_flat, self.schema.database_name, self.config.get("disable_precedent_masking", False)
         )#
 
         if "workload_embedder" in self.config:
@@ -808,6 +821,8 @@ class Experiment(object):
         perfs = []
         for perf in episode_performances:
             perfs.append(round(perf["achieved_cost"], 2))
+            print(f"DEBUG: perf dictionary: {perf}") # Added debug print
+            print(f"Selected indexes: {perf['indexes']}")
 
         mean_performance = np.mean(perfs)
         print(f"Mean performance: {mean_performance:.2f} ({perfs})")
@@ -829,7 +844,13 @@ class Experiment(object):
                 sb_version=self.config["rl_algorithm"]["stable_baselines_version"],
                 max_index_width=self.config["max_index_width"],
                 reenable_indexes=self.config["reenable_indexes"],
+                disable_precedent_masking=self.config.get("disable_precedent_masking", False),
+                debug_print=self.config.get("debug_print", False),
             )
+            if self.config.get("debug_print", False):
+                print(
+                    f"Action manager initialized with disable_precedent_masking={action_manager.disable_precedent_masking}"
+                )
 
             if self.number_of_actions is None:
                 self.number_of_actions = action_manager.number_of_actions

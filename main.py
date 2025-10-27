@@ -19,19 +19,23 @@ use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
 def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, weight_path='',
                           fix_index_count=0,
                           test_workload_from_file='', test_workload_qids='', newf=False,
-                          input_workload: Workload=None, random_seed=0, shuffle=False):
+                          input_workload: Workload=None, random_seed=0, shuffle=False, debug_print=False, cli_disable_precedent_masking=None, cli_enable_precedent_masking=None):
     CONFIGURATION_FILE = configuration_file
     np.random.seed(random_seed)
     random.seed(random_seed)
 
     logging.warning("use gpu:" + use_gpu)
     if test_only:
-        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, newf=newf, random_seed=random_seed)
+        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, newf=newf, random_seed=random_seed, debug_print=debug_print, cli_disable_precedent_masking=cli_disable_precedent_masking, cli_enable_precedent_masking=cli_enable_precedent_masking)
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
         experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle)
-        input_qids = [q.nr  for q in input_workload.queries]
+        if input_workload:
+            input_qids = [q.nr  for q in input_workload.queries]
+        else:
+            input_qids = [q.nr  for q in experiment.workload_generator.wl_testing[0][0].queries]
+
         experiment_base_name = experiment.id
         folder_path = experiment.experiment_folder_path
 
@@ -111,7 +115,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         else:
             logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
     else:
-        experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, random_seed=random_seed)
+        experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, random_seed=random_seed, debug_print=debug_print, cli_disable_precedent_masking=cli_disable_precedent_masking, cli_enable_precedent_masking=cli_enable_precedent_masking)
 
         if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
             from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
@@ -271,6 +275,9 @@ if __name__ == "__main__":
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
     parser.add_argument('--newf', action='store_true', default=False)
     parser.add_argument('--random_seed', type=int, default=0)
+    parser.add_argument('--debug_print', action='store_true', help='Enable debug print statements')
+    parser.add_argument('--disable_precedent_masking', action='store_const', const=True, default=None, help='Disable precedent masking')
+    parser.add_argument('--enable-precedent-masking', action='store_const', const=False, default=None, help='Enable precedent masking')
     args = parser.parse_args()
 
     if args.config:
@@ -286,5 +293,5 @@ if __name__ == "__main__":
     run_single_experiment(config_file, test_only=args.test_only, uni_freq=uni_freq_flag, weight_path=args.weight_path,\
                             fix_index_count=args.fix_index_count, ts=args.ts,
                             test_workload_from_file=args.test_workload_file, test_workload_qids = args.test_workload_qids,
-                            newf=args.newf, shuffle=args.shuffle)
+                            newf=args.newf, shuffle=args.shuffle, debug_print=args.debug_print, cli_disable_precedent_masking=args.disable_precedent_masking, cli_enable_precedent_masking=args.enable_precedent_masking)
 

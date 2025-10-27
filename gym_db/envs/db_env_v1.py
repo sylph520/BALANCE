@@ -95,17 +95,16 @@ class DBEnvV1(gym.Env):
 
 
         if not new_index.is_single_column():
-            parent_index = Index(new_index.columns[:-1])
+            if not self.action_manager.disable_precedent_masking:
+                parent_index = Index(new_index.columns[:-1])
 
-            for index in self.current_indexes:
-                if index == parent_index:
-                    old_index_size = index.estimated_size
+                for index in self.current_indexes:
+                    if index == parent_index:
+                        old_index_size = index.estimated_size
 
-            self.current_indexes.remove(parent_index)
+                self.current_indexes.remove(parent_index)
 
-            assert old_index_size > 0, "Parent index size must have been found if not single column index."
-
-
+                assert old_index_size > 0, "Parent index size must have been found if not single column index."
         print_flag = (self.steps_taken >= self.max_steps_per_episode) and testflag
 
 

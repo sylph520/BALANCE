@@ -58,16 +58,17 @@ class ActionManager(object):
         if actions_index_width == 1:
             self.current_action_status[last_action] += 1
         else:
-            combination_to_be_extended = self.indexable_column_combinations_flat[last_action][:-1]
-            assert combination_to_be_extended in self.current_combinations
+            if not self.disable_precedent_masking:
+                combination_to_be_extended = self.indexable_column_combinations_flat[last_action][:-1]
+                assert combination_to_be_extended in self.current_combinations
 
-            status_value = 1 / actions_index_width
+                status_value = 1 / actions_index_width
 
-            last_action_back_column = self.indexable_column_combinations_flat[last_action][-1]
-            last_action_back_columns_idx = self.column_to_idx[last_action_back_column]
-            self.current_action_status[last_action_back_columns_idx] += status_value
+                last_action_back_column = self.indexable_column_combinations_flat[last_action][-1]
+                last_action_back_columns_idx = self.column_to_idx[last_action_back_column]
+                self.current_action_status[last_action_back_columns_idx] += status_value
 
-            self.current_combinations.remove(combination_to_be_extended)
+                self.current_combinations.remove(combination_to_be_extended)
 
         self.current_combinations.add(self.indexable_column_combinations_flat[last_action])
 
@@ -184,7 +185,14 @@ class DRLindaActionManager(ActionManager):
 
 class MultiColumnIndexActionManager(ActionManager):
     def __init__(
-        self, indexable_column_combinations, action_storage_consumptions, sb_version, max_index_width, reenable_indexes
+        self,
+        indexable_column_combinations,
+        action_storage_consumptions,
+        sb_version,
+        max_index_width,
+        reenable_indexes,
+        disable_precedent_masking=False,
+        debug_print=False,
     ):
         ActionManager.__init__(self, sb_version, max_index_width=max_index_width)
 
@@ -202,6 +210,8 @@ class MultiColumnIndexActionManager(ActionManager):
         )
 
         self.REENABLE_INDEXES = reenable_indexes
+        self.disable_precedent_masking = disable_precedent_masking
+        self.debug_print = debug_print
 
         self.column_to_idx = {}
         for idx, column in enumerate(self.indexable_column_combinations[0]):
@@ -226,6 +236,10 @@ class MultiColumnIndexActionManager(ActionManager):
             self.candidate_dependent_map[dependent_of].append(column_combination_idx)
 
     def _valid_actions_based_on_last_action(self, last_action):
+        if self.disable_precedent_masking:
+            if self.debug_print:
+                print("Precedent masking is disabled for fair comparison.")
+            return
         last_combination = self.indexable_column_combinations_flat[last_action]
         last_combination_length = len(last_combination)
 
@@ -275,18 +289,24 @@ class MultiColumnIndexActionManager(ActionManager):
             logging.debug(f"REENABLE_INDEXES: {last_combination_without_extension} after {last_combination}")
 
     def _valid_actions_based_on_workload(self, workload):
-        indexable_columns = workload.indexable_columns(return_sorted=False)
-        indexable_columns = indexable_columns & frozenset(self.indexable_columns)
-        self.wl_indexable_columns = indexable_columns
+        if self.disable_precedent_masking:
+            # Enable all potential actions (multi-column indexes included)
+            for column_combination_idx, _ in enumerate(self.indexable_column_combinations_flat):
+                self.valid_actions[column_combination_idx] = self.ALLOWED_ACTION
+                self._remaining_valid_actions.append(column_combination_idx)
+        else:
+            indexable_columns = workload.indexable_columns(return_sorted=False)
+            indexable_columns = indexable_columns & frozenset(self.indexable_columns)
+            self.wl_indexable_columns = indexable_columns
 
-        for indexable_column in indexable_columns:
-            # only single column indexes
-            for column_combination_idx, indexable_column_combination in enumerate(
-                self.indexable_column_combinations[0]
-            ):
-                if indexable_column == indexable_column_combination[0]:
-                    self.valid_actions[column_combination_idx] = self.ALLOWED_ACTION
-                    self._remaining_valid_actions.append(column_combination_idx)
+            for indexable_column in indexable_columns:
+                # only single column indexes
+                for column_combination_idx, indexable_column_combination in enumerate(
+                    self.indexable_column_combinations[0]
+                ):
+                    if indexable_column == indexable_column_combination[0]:
+                        self.valid_actions[column_combination_idx] = self.ALLOWED_ACTION
+                        self._remaining_valid_actions.append(column_combination_idx)
 
 
 

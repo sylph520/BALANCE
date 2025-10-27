@@ -6,7 +6,7 @@ from index_selection_evaluation.selection.index import Index
 
 
 # Todo: This could be improved by passing index candidates as input
-def predict_index_sizes(column_combinations, database_name):
+def predict_index_sizes(column_combinations, database_name, disable_precedent_masking=False):
     connector = PostgresDatabaseConnector(database_name, autocommit=True)
     connector.drop_indexes()
 
@@ -21,11 +21,14 @@ def predict_index_sizes(column_combinations, database_name):
         cost_evaluation.what_if.simulate_index(potential_index, True)
 
         full_index_size = potential_index.estimated_size
-        index_delta_size = full_index_size
-        if len(column_combination) > 1:
-            index_delta_size -= parent_index_size_map[column_combination[:-1]]
+        if disable_precedent_masking:
+            predicted_index_sizes.append(full_index_size)
+        else:
+            index_delta_size = full_index_size
+            if len(column_combination) > 1:
+                index_delta_size -= parent_index_size_map[column_combination[:-1]]
 
-        predicted_index_sizes.append(index_delta_size)
+            predicted_index_sizes.append(index_delta_size)
         cost_evaluation.what_if.drop_simulated_index(potential_index)
 
         parent_index_size_map[column_combination] = full_index_size
