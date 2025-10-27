@@ -43,6 +43,9 @@ def main():
     # parser.add_argument('--weight_path', type=str, default='query_files/tpch12/weight1.pkl')
     parser.add_argument('--weight_list_path', type=str, default='')
     parser.add_argument('--shuffle', action='store_true', default=False)
+    parser.add_argument('--debug_print', action='store_true', help='Enable debug print statements')
+    parser.add_argument('--disable_precedent_masking', action='store_const', const=True, default=None, help='Disable precedent masking')
+    parser.add_argument('--enable-precedent-masking', action='store_const', const=False, default=None, help='Enable precedent masking')
     args = parser.parse_args()
 
     benchmark = args.bm
@@ -69,10 +72,11 @@ def main():
         uni_freq_flag = False
     else:
         uni_freq_flag = args.uni_freq
-        if uni_freq_flag:
-            base_config['workload']['varying_frequencies'] = False
-        else:
-            base_config['workload']['varying_frequencies'] = True
+
+    if uni_freq_flag:
+        base_config['workload']['varying_frequencies'] = False
+    else:
+        base_config['workload']['varying_frequencies'] = True
 
     if uni_freq_flag:
         freq_label = 'uniFreq'
@@ -214,7 +218,11 @@ def main():
             chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
             res_path = run_single_experiment(chunk_config_path, test_only=True, ts=config['timesteps'],
                         uni_freq=uni_freq_flag, fix_index_count=config['fix_index_count'], newf=args.newf,
-                        input_workload=w, weight_path=weight_path_list[w_ptr], shuffle=args.shuffle)
+                        input_workload=w, weight_path=weight_path_list[w_ptr], shuffle=args.shuffle,
+                        cli_disable_precedent_masking=args.cli_disable_precedent_masking,
+                        cli_enable_precedent_masking=args.cli_enable_precedent_masking,
+                        disable_precedent_masking=args.disable_precedent_masking
+                        )
             print(f"test the model for new workload fits in the chunk {chunk_ptr}")
         w_ptr += 1
 

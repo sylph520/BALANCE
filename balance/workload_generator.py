@@ -392,7 +392,7 @@ class WorkloadGenerator(object):
         while required_unique_workloads > len(unique_workload_tuples):
             workload_tuple = self._generate_random_workload(size, unknown_query_probability, weight_path, shuffle)
             unique_workload_tuples.add(workload_tuple)
-            if not self.varying_frequencies or not shuffle:
+            if not self.varying_frequencies and not shuffle:
                 validation_instances = 1
                 test_instances = 1
                 break
@@ -521,7 +521,7 @@ class WorkloadGenerator(object):
         else:
             if len(self.available_query_classes)<size:
                 size = len(self.available_query_classes)
-            if self.gen_one>0+9: # if False:
+            if False: # if self.gen_one>0+9:
                 workload_query_classes = self.rnd.choice(self.temp_genone)
             else:
                 workload_query_classes = tuple(self.rnd.sample(self.available_query_classes, size))
