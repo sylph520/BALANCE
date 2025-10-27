@@ -34,7 +34,9 @@ class DummyWorkloadGenerator:
         self.number_of_query_classes = number_of_query_classes
 
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, ts=0, lsi_dimension=None, newf=False, random_seed=None, debug_print=False, cli_disable_precedent_masking=None, cli_enable_precedent_masking=None):
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, dmx_sz=0,
+                ts=0, lsi_dimension=None, newf=False, random_seed=None, debug_print=False,
+                cli_disable_precedent_masking=None, cli_enable_precedent_masking=None):
         """
         setup the experiment from configuration, random seed, and related method info
         """
@@ -73,6 +75,9 @@ class Experiment(object):
         # __import__('ipdb').set_trace()
         if ts:
             self.config['timesteps'] = ts
+        if dmx_sz:
+            self.config['workload_embedder']['representation_size'] = dmx_sz
+
         if aa!=None:
             self.config["id"] = "TPCDS_depart_unknow_"+aa
             self.config["workload"]["unknown_queries"] = int(aa)
@@ -281,11 +286,13 @@ class Experiment(object):
         # test_wl = self.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
         # test_wl.budget = 3
         # self.test_fm = self.test_model(self.model, wl_testing=[[test_wl]])[0]
+        logging.info("start evaluating final model")
         self.test_fm = self.test_model(self.model)[0]
         self.vali_fm = self.validate_model(self.model)[0]
 
         self.moving_average_model = self.model_type.load(f"{self.experiment_folder_path}/moving_average_model.zip")
         self.moving_average_model.training = False
+        logging.info("start evaluating moving_average_model")
         self.test_ma = self.test_model(self.moving_average_model)[0]
         self.vali_ma = self.validate_model(self.moving_average_model)[0]
         if len(self.multi_validation_wl) > 0:
@@ -298,6 +305,7 @@ class Experiment(object):
 
         self.moving_average_model_3 = self.model_type.load(f"{self.experiment_folder_path}/moving_average_model_3.zip")
         self.moving_average_model_3.training = False
+        logging.info("start evaluating moving_average_model_3")
         self.test_ma_3 = self.test_model(self.moving_average_model_3)[0]
         self.vali_ma_3 = self.validate_model(self.moving_average_model_3)[0]
         if len(self.multi_validation_wl) > 0:
@@ -310,6 +318,7 @@ class Experiment(object):
 
         self.best_mean_reward_model = self.model_type.load(f"{self.experiment_folder_path}/best_mean_reward_model.zip")
         self.best_mean_reward_model.training = False
+        logging.info("start evaluating best_mean_reward_model")
         self.test_bm = self.test_model(self.best_mean_reward_model)[0]
         self.vali_bm = self.validate_model(self.best_mean_reward_model)[0]
         if len(self.multi_validation_wl) > 0:
