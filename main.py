@@ -10,19 +10,16 @@ import tensorflow as tf
 import numpy as np
 
 import random
-import importlib
-import gym
-import json
-import sys
 
 import gym_db  # noqa: F401
 from index_selection_evaluation.selection.workload import Workload
 
 use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
 
-def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, fix_index_count=0,
+def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, weight_path='',
+                          fix_index_count=0,
                           test_workload_from_file='', test_workload_qids='', newf=False,
-                          input_workload: Workload=None, random_seed=0):
+                          input_workload: Workload=None, random_seed=0, shuffle=False):
     CONFIGURATION_FILE = configuration_file
     np.random.seed(random_seed)
     random.seed(random_seed)
@@ -33,7 +30,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
-        experiment.prepare(input_workload)
+        experiment.prepare(input_workload, weights_path=weight_path, shuffle=shuffle)
         input_qids = [q.nr  for q in input_workload.queries]
         experiment_base_name = experiment.id
         folder_path = experiment.experiment_folder_path
@@ -130,7 +127,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         else:
             raise ValueError
 
-        experiment.prepare(input_workload)
+        experiment.prepare(input_workload, weights_path=weight_path, shuffle=shuffle)
         with open(f"{experiment.experiment_folder_path}/experiment_object.pickle", "wb") as handle:
             pickle.dump(experiment, handle, protocol=pickle.HIGHEST_PROTOCOL)
         ParallelEnv = SubprocVecEnv if experiment.config["parallel_environments"] > 1 else DummyVecEnv
@@ -265,8 +262,11 @@ if __name__ == "__main__":
     parser.add_argument('--load_model', type=str, help='Path to saved model to test instead of training')
     parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
     parser.add_argument('--uni_freq', action='store_true', default=True)
+    # parser.add_argument('--weight_path', type=str, default='query_files/tpch12/weight1.pkl')
+    parser.add_argument('--weight_path', type=str, default='')
+    parser.add_argument('--shuffle', action='store_true', default=False)
     parser.add_argument('--fix_index_count', type=int, default=0)
-    parser.add_argument('--test_workload', type=str, help='Path to a .sql file to use as a custom test workload.')
+    parser.add_argument('--test_workload_file', type=str, help='Path to a .sql file to use as a custom test workload.')
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
     parser.add_argument('--newf', action='store_true', default=False)
     parser.add_argument('--random_seed', type=int, default=0)
@@ -277,7 +277,13 @@ if __name__ == "__main__":
     else:
         config_file = f"experiments/{(args.wk_type).lower()}.json"
 
-    run_single_experiment(config_file, test_only=args.test_only, uni_freq=args.uni_freq,\
+    if args.weight_path:
+        uni_freq_flag = False
+    else:
+        uni_freq_flag=args.uni_freq
+
+    run_single_experiment(config_file, test_only=args.test_only, uni_freq=uni_freq_flag, weight_path=args.weight_path,\
                             fix_index_count=args.fix_index_count, ts=args.ts,
-                            test_workload_from_file=args.test_workload, test_workload_qids = args.test_workload_qids, newf=args.newf)
+                            test_workload_from_file=args.test_workload_file, test_workload_qids = args.test_workload_qids,
+                            newf=args.newf, shuffle=args.shuffle)
 

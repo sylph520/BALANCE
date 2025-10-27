@@ -3,6 +3,7 @@ import copy
 import logging
 import random
 from typing import List
+import pickle
 
 import numpy as np
 
@@ -26,7 +27,7 @@ class WorkloadGenerator(object):
         self, config, workload_columns, random_seed, database_name, experiment_id=None,
         filter_utilized_columns=None,experiment_folder_path=None,spath=None,
         tpl2tid={},
-        input_workload=None
+        input_workload=None, weight_path='',shuffle=False
     ):
         self.benchmark = config["benchmark"]
         assert self.benchmark  in [
@@ -79,7 +80,7 @@ class WorkloadGenerator(object):
             self.wl_validation = [None]
             self.wl_testing = [None]
             _, self.wl_validation[0], self.wl_testing[0] = self._generate_workloads(
-                0, validation_instances, test_instances, config["size"]
+                0, validation_instances, test_instances, config["size"], weight_path=weight_path, shuffle=shuffle
             )
             if config["query_class_change_frequency"] is None:
                 self.wl_training = self._generate_similar_workloads(config["training_instances"], config["size"])
@@ -125,6 +126,7 @@ class WorkloadGenerator(object):
                     test_instances,
                     config["size"],
                     unknown_query_probability=unknown_query_probability,
+                    weight_path=weight_path, shuffle=shuffle
                 )
                 self.wl_validation.append(wl_validation)
                 self.wl_testing.append(wl_testing)
@@ -151,7 +153,7 @@ class WorkloadGenerator(object):
                 else:
                     self.wl_training = self._generate_similar_workloads(config["training_instances"], config["size"])
             else:
-                self.wl_training, _, _ = self._generate_workloads(config["training_instances"], 0, 0, config["size"])
+                self.wl_training, _, _ = self._generate_workloads(config["training_instances"], 0, 0, config["size"], weight_path=weight_path, shuffle=shuffle)
             # We are removing the restriction now.
             self.available_query_classes = original_available_query_classes
         elif config["unknown_queries"] > 0 and config["validation_testing"]["unknown_query_probabilities"][-1] <= 0.01:
@@ -219,7 +221,7 @@ class WorkloadGenerator(object):
                 else:
                     self.wl_training = self._generate_similar_workloads(config["training_instances"], config["size"])
             else:
-                self.wl_training, _, _ = self._generate_workloads(config["training_instances"], 0, 0, config["size"])
+                self.wl_training, _, _ = self._generate_workloads(config["training_instances"], 0, 0, config["size"], weight_path=weight_path, shuffle=shuffle)
             # We are removing the restriction now.
             self.available_query_classes = original_available_query_classes
         else:
@@ -227,10 +229,11 @@ class WorkloadGenerator(object):
             self.wl_testing = [None]
             if not input_workload:
                 self.wl_training, self.wl_validation[0], self.wl_testing[0] = self._generate_workloads(
-                            config["training_instances"], validation_instances, test_instances, config["size"]
+                            config["training_instances"], validation_instances, test_instances, config["size"],
+                            weight_path=weight_path, shuffle=shuffle
                     )
             else:
-                workload_class_order, _ = self._generate_random_workload(config["size"])
+                workload_class_order, workload_class_freq = self._generate_random_workload(config["size"], weight_path=weight_path, shuffle=shuffle)
                 input_workload.queries =  [input_workload.queries[workload_class_order[i]-1] for i in  range(config['size'])]
                 self.wl_training = [input_workload]
                 self.wl_validation = [[input_workload]]
@@ -375,7 +378,7 @@ class WorkloadGenerator(object):
         return workloads
 
     def _generate_workloads(
-        self, train_instances, validation_instances, test_instances, size, unknown_query_probability=None
+        self, train_instances, validation_instances, test_instances, size, unknown_query_probability=None, weight_path='', shuffle=False
     ):
         required_unique_workloads = train_instances + validation_instances + test_instances
 
@@ -384,9 +387,9 @@ class WorkloadGenerator(object):
         unique_workload_tuples = set()
         # sample *required_unique_workloads* number of workloads
         while required_unique_workloads > len(unique_workload_tuples):
-            workload_tuple = self._generate_random_workload(size, unknown_query_probability)
+            workload_tuple = self._generate_random_workload(size, unknown_query_probability, weight_path, shuffle)
             unique_workload_tuples.add(workload_tuple)
-            if not self.varying_frequencies:
+            if not self.varying_frequencies or not shuffle:
                 validation_instances = 1
                 test_instances = 1
                 break
@@ -394,13 +397,13 @@ class WorkloadGenerator(object):
         validation_tuples = self.rnd.sample(unique_workload_tuples, validation_instances)
         test_workload_tuples = self.rnd.sample(unique_workload_tuples, test_instances)
 
-        if self.varying_frequencies:
+        if self.varying_frequencies and shuffle:
             unique_workload_tuples = unique_workload_tuples - set(validation_tuples)
             unique_workload_tuples = unique_workload_tuples - set(test_workload_tuples)
 
         train_workload_tuples = unique_workload_tuples
 
-        if self.varying_frequencies:
+        if self.varying_frequencies and shuffle:
             assert (
                 len(train_workload_tuples) + len(test_workload_tuples) + len(validation_tuples) == required_unique_workloads
             )
@@ -497,7 +500,7 @@ class WorkloadGenerator(object):
 
         return workloads
 
-    def _generate_random_workload(self, size, unknown_query_probability=None):
+    def _generate_random_workload(self, size, unknown_query_probability=None, weight_path='', shuffle=False):
         assert size <= self.number_of_query_classes, "Cannot generate workload with more queries than query classes"
 
         workload_query_classes = None
@@ -524,7 +527,12 @@ class WorkloadGenerator(object):
 
         # Create frequencies
         if self.varying_frequencies:
-            query_class_frequencies = tuple(list(self.np_rnd.integers(1, 10000, size)))
+            if not weight_path:
+                query_class_frequencies = tuple(list(self.np_rnd.integers(1, 10000, size)))
+            else:
+                with open(weight_path, 'rb') as f:
+                    weight_list = pickle.load(f)
+                query_class_frequencies = tuple(weight_list)
         else:
             query_class_frequencies = tuple([1 for frequency in range(size)])
 
