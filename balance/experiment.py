@@ -45,10 +45,14 @@ class Experiment(object):
         self.config = cp.config
         self.config['random_seed'] = random_seed
         self.fix_index_count = fix_index_count
-        if uni_freq:
-            self.config['workload']['varying_frequencies'] = False
         if fix_index_count:
             self.fix_index_count = fix_index_count
+
+        if uni_freq:
+            self.config['workload']['varying_frequencies'] = False
+        else:
+            self.config['workload']['varying_frequencies'] = True
+
         if newf:
             self.config['use_new_box_line_format'] = True
         else:
@@ -130,7 +134,7 @@ class Experiment(object):
         return Workload(final_queries, description=f"Custom workload from {os.path.basename(filepath)}")
 
 
-    def prepare(self, input_workload=None, weights_path='', shuffle=False):
+    def prepare(self, input_workload=None, weight_path='', shuffle=False):
         """
         setup self.schema, self.workload_generator (for training, validation and testing),
         experiment budgets (randomly selected from fixed lists),
@@ -167,7 +171,7 @@ class Experiment(object):
                 filter_utilized_columns=self.config["filter_utilized_columns"],
                 experiment_folder_path =self.experiment_folder_path,
                 input_workload = input_workload,
-                weight_path = weights_path,
+                weight_path = weight_path,
                 shuffle=shuffle
             )
         self._assign_budgets_to_workloads()

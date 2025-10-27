@@ -30,7 +30,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
-        experiment.prepare(input_workload, weights_path=weight_path, shuffle=shuffle)
+        experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle)
         input_qids = [q.nr  for q in input_workload.queries]
         experiment_base_name = experiment.id
         folder_path = experiment.experiment_folder_path
@@ -127,7 +127,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         else:
             raise ValueError
 
-        experiment.prepare(input_workload, weights_path=weight_path, shuffle=shuffle)
+        experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle)
         with open(f"{experiment.experiment_folder_path}/experiment_object.pickle", "wb") as handle:
             pickle.dump(experiment, handle, protocol=pickle.HIGHEST_PROTOCOL)
         ParallelEnv = SubprocVecEnv if experiment.config["parallel_environments"] > 1 else DummyVecEnv
@@ -253,6 +253,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         experiment.finishmy()
 
         return experiment.experiment_folder_path
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

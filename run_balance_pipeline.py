@@ -39,9 +39,14 @@ def main():
     parser.add_argument('--newf', action='store_true', default=False)
     parser.add_argument('--uniComp', action='store_true', default=False)
     parser.add_argument('--random_seed', type=int, default=0, help='Set a random seed for reproducibility')
+    parser.add_argument('--uni_freq', action='store_true', default=True)
+    # parser.add_argument('--weight_path', type=str, default='query_files/tpch12/weight1.pkl')
+    parser.add_argument('--weight_list_path', type=str, default='')
+    parser.add_argument('--shuffle', action='store_true', default=False)
     args = parser.parse_args()
 
     benchmark = args.bm
+
     # --- Step 1: Generate a continuous stream of workloads ---
     logging.info("--- Step 1: Generating a continuous workload stream ---")
 
@@ -59,6 +64,20 @@ def main():
     if args.ts:
         base_config['timesteps'] = args.ts
 
+    if args.weight_list_path:
+        base_config['workload']['varying_frequencies'] = True
+        uni_freq_flag = False
+    else:
+        uni_freq_flag = args.uni_freq
+        if uni_freq_flag:
+            base_config['workload']['varying_frequencies'] = False
+        else:
+            base_config['workload']['varying_frequencies'] = True
+
+    if uni_freq_flag:
+        freq_label = 'uniFreq'
+    else:
+        freq_label = 'varyFreq'
 
     hash2tid = {}
     tpl2tid = {}
@@ -130,7 +149,7 @@ def main():
 
     schema = Schema(base_config["workload"]["benchmark"], base_config["workload"]["scale_factor"], base_config["database"], base_config["column_filters"])
     parsing_workload_generator = WorkloadGenerator(base_config["workload"], spath=base_config["workload"]["path"], workload_columns=schema.columns, random_seed=args.random_seed,
-                                     database_name=dbname, experiment_id="", tpl2tid=tpl2tid)
+                                     database_name=dbname, experiment_id="", tpl2tid=tpl2tid, dummy=True)
 
     # We need the template IDs (the query text) for the segmentation logic
     workload_strset_stream = [set(wl.keys()) for wl in flat_workload_stream_dicts]
@@ -149,9 +168,12 @@ def main():
         config['fix_index_count'] = config['constraint_value']
     else:
         config['fix_index_count'] = config.get('fix_index_count', 0)
-    freq_label = 'varyFreq' if config['workload']['varying_frequencies'] else 'uniFreq'
 
     ws_debug = []
+
+    weight_path_list = [os.path.join(args.weight_list_path, f"weights{i}.pkl") for i in range(1, args.wk_size + 1)]
+
+    w_ptr = 0
     for wdict in flat_workload_stream_dicts:
         w = convert_dict_to_workload(wdict, workload_generator=parsing_workload_generator, unify_similar_ops=args.uniComp)
         ws_debug.append(w)
@@ -167,9 +189,11 @@ def main():
             chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
             with open(chunk_config_path, 'w') as f:
                 json.dump(config, f, indent=4)
+
             res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'],
-                        uni_freq=freq_label, fix_index_count=config['fix_index_count'], newf=args.newf,
-                        input_workload=w, random_seed=args.random_seed)
+                        uni_freq=uni_freq_flag, fix_index_count=config['fix_index_count'], newf=args.newf,
+                        input_workload=w, random_seed=args.random_seed,
+                        weight_path=weight_path_list[w_ptr], shuffle=args.shuffle)
             logging.info("trained a model")
 
             # b. Update the source model path for the next iteration
@@ -189,9 +213,10 @@ def main():
             chunks[-1].append(w)
             chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
             res_path = run_single_experiment(chunk_config_path, test_only=True, ts=config['timesteps'],
-                        uni_freq=freq_label, fix_index_count=config['fix_index_count'], newf=args.newf,
-                        input_workload=w)
+                        uni_freq=uni_freq_flag, fix_index_count=config['fix_index_count'], newf=args.newf,
+                        input_workload=w, weight_path=weight_path_list[w_ptr], shuffle=args.shuffle)
             print(f"test the model for new workload fits in the chunk {chunk_ptr}")
+        w_ptr += 1
 
 
 
