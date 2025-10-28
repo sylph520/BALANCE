@@ -20,14 +20,18 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                           fix_index_count=0, dmx_sz=0,
                           test_workload_from_file='', test_workload_qids='', newf=False,
                           input_workload: Workload=None, random_seed=0, shuffle=False, debug_print=False,
-                          cli_disable_precedent_masking=None, cli_enable_precedent_masking=None):
+                          cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
+                          tb_log_path=''):
     CONFIGURATION_FILE = configuration_file
+    if tb_log_path  == 'None':
+        tb_log_path = None
     np.random.seed(random_seed)
     random.seed(random_seed)
+    tb_log_path = tb_log_path
 
     logging.warning("use gpu:" + use_gpu)
     if test_only:
-        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, 
+        experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts,
                 newf=newf, random_seed=random_seed, debug_print=debug_print, dmx_sz=dmx_sz,
                 cli_disable_precedent_masking=cli_disable_precedent_masking, cli_enable_precedent_masking=cli_enable_precedent_masking)
         import os
@@ -163,7 +167,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 verbose=2,
                 seed=experiment.config["random_seed"],
                 gamma=experiment.config["rl_algorithm"]["gamma"],
-                tensorboard_log="tensor_log",
+                tensorboard_log=tb_log_path,
                 acc=temac,
                 policy_kwargs=copy.copy(
                     experiment.config["rl_algorithm"]["model_architecture"]
@@ -177,7 +181,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 verbose=2,
                 seed=experiment.config["random_seed"],
                 gamma=experiment.config["rl_algorithm"]["gamma"],
-                tensorboard_log="tensor_log",
+                tensorboard_log=tb_log_path,
                 policy_kwargs=copy.copy(
                     experiment.config["rl_algorithm"]["model_architecture"]
                 ),  # This is necessary because SB modifies the passed dict.
@@ -284,6 +288,7 @@ if __name__ == "__main__":
     parser.add_argument('--disable_precedent_masking', action='store_const', const=True, default=None, help='Disable precedent masking')
     parser.add_argument('--enable-precedent-masking', action='store_const', const=False, default=None, help='Enable precedent masking')
     parser.add_argument('--dmx_sz', type=int, default=0)
+    parser.add_argument('--tb_log', type=str, default='tensor_log')
     args = parser.parse_args()
 
     if args.config:
@@ -301,5 +306,7 @@ if __name__ == "__main__":
                             test_workload_from_file=args.test_workload_file, test_workload_qids = args.test_workload_qids,
                             dmx_sz = args.dmx_sz,
                             newf=args.newf, shuffle=args.shuffle, debug_print=args.debug_print,
-                            cli_disable_precedent_masking=args.disable_precedent_masking, cli_enable_precedent_masking=args.enable_precedent_masking)
+                            cli_disable_precedent_masking=args.disable_precedent_masking,
+                            cli_enable_precedent_masking=args.enable_precedent_masking,
+                            tb_log_path = args.tb_log)
 

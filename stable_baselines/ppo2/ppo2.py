@@ -486,6 +486,10 @@ class PPO2(ActorCriticRLModel):
 
                 if self.verbose >= 1 and (update % log_interval == 0 or update == 1):
                     explained_var = explained_variance(values, returns)
+                    if writer is not None:
+                        summary = tf.Summary(value=[tf.Summary.Value(tag='train/explained_variance', simple_value=explained_var)])
+                        writer.add_summary(summary, self.num_timesteps)
+
                     logger.logkv("serial_timesteps", update * self.n_steps)
                     logger.logkv("n_updates", update)
                     logger.logkv("total_timesteps", self.num_timesteps)

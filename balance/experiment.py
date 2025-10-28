@@ -407,12 +407,19 @@ class Experiment(object):
         # __import__('ipdb').set_trace()
         # self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}"
         self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}_ts{self.config['timesteps']}"
+        self.experiment_folder_path += f"_dmxsz{self.config['workload_embedder']['representation_size']}"
+
         if self.config['workload']['varying_frequencies']:
             self.experiment_folder_path += '_varyFreq'
         else:
             self.experiment_folder_path += '_uniFreq'
         if self.fix_index_count:
             self.experiment_folder_path += f'_idxmax{self.fix_index_count}'
+
+        if not self.config['disable_precedent_masking']:
+            self.experiment_folder_path += 'ONprecedentMasking'
+        else:
+            self.experiment_folder_path += 'OFFprecedentMasking'
 
         import shutil
 
