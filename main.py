@@ -1,5 +1,7 @@
 import os
+import glob
 import copy
+import shutil
 import logging
 import pickle
 from gym_db.common import EnvironmentType
@@ -89,6 +91,35 @@ class PPODiagnosticsCallback(BaseCallback):
         return True
 
 
+def _get_latest_tb_run_id(log_path, log_name):
+    if not log_path or not log_name:
+        return 0
+    pattern = os.path.join(log_path, f"{log_name}_*")
+    max_run_id = 0
+    for path in glob.glob(pattern):
+        file_name = os.path.basename(path)
+        parts = file_name.rsplit("_", 1)
+        if len(parts) != 2:
+            continue
+        prefix, suffix = parts
+        if prefix != log_name or not suffix.isdigit():
+            continue
+        run_id = int(suffix)
+        if run_id > max_run_id:
+            max_run_id = run_id
+    return max_run_id
+
+
+def _resolve_tb_run_dir(log_path, log_name, new_tb_log):
+    if not log_path or not log_name:
+        return None
+    latest_run_id = _get_latest_tb_run_id(log_path, log_name)
+    run_id = latest_run_id + 1 if new_tb_log else latest_run_id
+    if run_id < 0:
+        run_id = 0
+    return os.path.join(log_path, f"{log_name}_{run_id}")
+
+
 def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, weight_path='',
                           fix_index_count=0, dmx_sz=0,
                           test_workload_from_file='', test_workload_qids='', newf=False,
@@ -96,7 +127,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                           random_seed=0, shuffle=False, debug_print=False,
                           cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
                           tb_log_path='',
-                          lr=0.00025, ec=0.01, cr=0.2, ns=128, gamma=0.99):
+                          lr=0.00025, ec=0.01, cr=0.2, ns=128, gamma=0.99,
+                          dump_initial_config=True):
     CONFIGURATION_FILE = configuration_file
     if tb_log_path  == 'None':
         tb_log_path = None
@@ -268,6 +300,9 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         logging.warning(f"Creating model with NN architecture: {experiment.config['rl_algorithm']['model_architecture']}")
 
         experiment.set_model(model)
+        tb_run_dir = None
+        if dump_initial_config:
+            experiment.dump_config_snapshot(experiment.experiment_folder_path, filename="config.initial.json")
 
         callback_test_env = VecNormalize(
             DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)]),
@@ -329,6 +364,9 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
 
         experiment.start_learning()
         tb_log_name = 'tblog_'+experiment.experiment_folder_path.split('/')[-1]
+        new_tb_log = model.num_timesteps == 0
+        if tb_log_path:
+            tb_run_dir = _resolve_tb_run_dir(tb_log_path, tb_log_name, new_tb_log)
 
         model.learn(
             total_timesteps=experiment.config["timesteps"],
@@ -340,8 +378,15 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             validation_callback.moving_average_step * experiment.config["parallel_environments"],
             validation_callback.best_model_step * experiment.config["parallel_environments"],
         )
-        if tb_log_path:
-            tb_run_dir = os.path.join(tb_log_path, tb_log_name)
+        if tb_run_dir:
+            os.makedirs(tb_run_dir, exist_ok=True)
+            if dump_initial_config:
+                initial_src = os.path.join(experiment.experiment_folder_path, "config.initial.json")
+                if os.path.exists(initial_src):
+                    try:
+                        shutil.copy2(initial_src, os.path.join(tb_run_dir, "config.initial.json"))
+                    except Exception as exc:
+                        logging.warning("Failed to copy initial config to TensorBoard dir %s: %s", tb_run_dir, exc)
             experiment.dump_config_snapshot(tb_run_dir)
 
         with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
@@ -373,6 +418,7 @@ if __name__ == "__main__":
     parser.add_argument('--enable-precedent-masking', action='store_const', const=False, default=None, help='Enable precedent masking')
     parser.add_argument('--dmx_sz', type=int, default=0)
     parser.add_argument('--tb_log', type=str, default='tensor_log')
+    parser.add_argument('--skip_initial_config_dump', action='store_true', help='Skip writing pre-training config snapshots.')
     parser.add_argument('--lr', type=float, default=-1)
     parser.add_argument('--ns', type=int, default=-1)
     parser.add_argument('--ec', type=float, default=-1)
@@ -398,4 +444,5 @@ if __name__ == "__main__":
                             cli_disable_precedent_masking=args.disable_precedent_masking,
                             cli_enable_precedent_masking=args.enable_precedent_masking,
                             tb_log_path = args.tb_log,
-                            lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma)
+                            lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma,
+                            dump_initial_config=not args.skip_initial_config_dump)
