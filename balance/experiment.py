@@ -7,6 +7,7 @@ import os
 import pickle
 import random
 import subprocess
+import re
 
 import gym
 import numpy as np
@@ -464,6 +465,9 @@ class Experiment(object):
         # self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}"
         self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}_ts{self.config['timesteps']}"
         self.experiment_folder_path += f"_dmxsz{self.config['workload_embedder']['representation_size']}"
+        rl_suffix = self._build_rl_suffix()
+        if rl_suffix:
+            self.experiment_folder_path += f"_{rl_suffix}"
 
         if self.config['workload']['varying_frequencies']:
             self.experiment_folder_path += '_varyFreq'
@@ -488,6 +492,47 @@ class Experiment(object):
             # When testing, just make sure the folder exists
             if not os.path.exists(self.experiment_folder_path):
                 os.makedirs(self.experiment_folder_path, exist_ok=True)
+
+    def _build_rl_suffix(self):
+        rl_cfg = self.config.get("rl_algorithm", {}) or {}
+        suffix_tokens = []
+
+        algo = rl_cfg.get("algorithm")
+        if algo:
+            suffix_tokens.append(self._sanitize_token(algo))
+
+        args = rl_cfg.get("args", {}) or {}
+        for key in sorted(args.keys()):
+            value = args[key]
+            suffix_tokens.append(
+                f"{self._sanitize_token(key)}{self._sanitize_token(self._format_value(value))}"
+            )
+
+        if "gamma" in rl_cfg:
+            suffix_tokens.append(
+                f"gamma{self._sanitize_token(self._format_value(rl_cfg['gamma']))}"
+            )
+
+        return "-".join(suffix_tokens)
+
+    @staticmethod
+    def _format_value(value):
+        if isinstance(value, float):
+            return f"{value:.6g}"
+        return str(value)
+
+    @staticmethod
+    def _sanitize_token(text):
+        text = str(text)
+        text = text.replace(" ", "")
+        text = text.replace("/", "_")
+        text = text.replace("\\", "_")
+        text = text.replace(":", "_")
+        text = text.replace(",", "_")
+        text = text.replace(".", "p")
+        text = text.replace("-", "m")
+        text = re.sub(r"[^A-Za-z0-9_]+", "", text)
+        return text
 
     def _write_report(self,dbname):
         with open(f"{self.experiment_folder_path}/report_ID_{self.id}_{dbname}.txt", "w") as f:
