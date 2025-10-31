@@ -110,7 +110,6 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 newf=newf, random_seed=random_seed, debug_print=debug_print, dmx_sz=dmx_sz,
                 cli_disable_precedent_masking=cli_disable_precedent_masking, cli_enable_precedent_masking=cli_enable_precedent_masking,
                 lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma)
-        import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
         experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle, input_workload_path=test_workload_from_file)
@@ -341,6 +340,9 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             validation_callback.moving_average_step * experiment.config["parallel_environments"],
             validation_callback.best_model_step * experiment.config["parallel_environments"],
         )
+        if tb_log_path:
+            tb_run_dir = os.path.join(tb_log_path, tb_log_name)
+            experiment.dump_config_snapshot(tb_run_dir)
 
         with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
             pickle.dump([training_env.venv.envs[0].dic, callbacks[0].eval_env.venv.envs[0].dic, callbacks[1].eval_env.venv.envs[0].dic], handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -397,4 +399,3 @@ if __name__ == "__main__":
                             cli_enable_precedent_masking=args.enable_precedent_masking,
                             tb_log_path = args.tb_log,
                             lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma)
-

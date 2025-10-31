@@ -286,6 +286,49 @@ class Experiment(object):
         with open(f"{self.experiment_folder_path}/train_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_training, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    def dump_config_snapshot(self, target_dir, filename="config.final.json"):
+        """
+        Persist the resolved experiment configuration to the given directory.
+        """
+        if not target_dir:
+            return
+
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+        except Exception as exc:
+            logging.warning("Failed to create config directory %s: %s", target_dir, exc)
+            return
+
+        snapshot = self._json_safe(self.config)
+        destination = os.path.join(target_dir, filename)
+        tmp_destination = f"{destination}.tmp"
+
+        try:
+            with open(tmp_destination, "w") as handle:
+                json.dump(snapshot, handle, indent=2, sort_keys=True)
+            os.replace(tmp_destination, destination)
+        except Exception as exc:
+            logging.warning("Failed to write config snapshot to %s: %s", destination, exc)
+            if os.path.exists(tmp_destination):
+                try:
+                    os.remove(tmp_destination)
+                except OSError:
+                    pass
+
+    @staticmethod
+    def _json_safe(value):
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        if isinstance(value, dict):
+            return {key: Experiment._json_safe(val) for key, val in value.items()}
+        if isinstance(value, list):
+            return [Experiment._json_safe(item) for item in value]
+        if isinstance(value, tuple):
+            return [Experiment._json_safe(item) for item in value]
+        if isinstance(value, set):
+            return [Experiment._json_safe(item) for item in sorted(value, key=lambda x: str(x))]
+        return str(value)
+
     def finishmy(self):
         self.end_time = datetime.datetime.now()
 
@@ -374,6 +417,7 @@ class Experiment(object):
 
         self.model.save(f"{self.experiment_folder_path}/final_model")
         training_env.save(f"{self.experiment_folder_path}/vec_normalize.pkl")
+        self.dump_config_snapshot(self.experiment_folder_path)
 
         self.evaluated_episodes = 0
         for number_of_resets in training_env.get_attr("number_of_resets"):
