@@ -332,6 +332,8 @@ def get_column2pos_dict(benchmark):
         dbname = 'indexselection_tpch___1'
     elif benchmark.lower() in ['tpcds', 'tpcdsc']:
         dbname = 'indexselection_tpcds___10'
+    elif benchmark.lower() in ['job', 'ceb']:
+        dbname = 'indexselection_job___1'
     else:
         raise ValueError(f"{benchmark} not handled in get_column2pos_dict() yet")
     conn = psycopg2.connect(database=dbname, port=51204, host='/tmp')

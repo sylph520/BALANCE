@@ -136,6 +136,10 @@ if __name__ == "__main__":
         DB_NAME = "indexselection_tpch___1"  # The name of your TPCDS database
     elif args.bm.lower() in ['tpcds']:
         DB_NAME = "indexselection_tpcds___10"  # The name of your TPCDS database
+    elif args.bm.lower() in ['job', 'ceb']:
+        DB_NAME = "indexselection_job___1"  # The name of your ceb database
+    else:
+        raise ValueError(f"unknown benchmark {args.bm}")
     OUTPUT_PICKLE_FILE = f"{args.bm.lower()}_box_line_{args.format}.pickle"
     print(f"Starting {OUTPUT_PICKLE_FILE} generation script...")
 

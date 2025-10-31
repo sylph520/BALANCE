@@ -159,6 +159,8 @@ class TableGenerator:
                 and self.scale_factor != 0.001
             ):
                 raise Exception("Wrong TPCDS scale factor")
-
+        elif 'ceb' in self.benchmark_name.lower():
+            self.directory = './index_selection_evaluation/join-order-benchmark'
+            self.create_table_statements_file = 'schema.sql'
         else:
             raise NotImplementedError("only tpch/ds implemented.")

@@ -16,12 +16,87 @@ from index_selection_evaluation.selection.workload import Workload
 
 use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
 
+import math
+import datetime
+from stable_baselines.common.callbacks import BaseCallback
+
+class PPODiagnosticsCallback(BaseCallback):
+    """
+    Logs and warns when PPO training shows unhealthy patterns:
+    - critic collapse (explained variance < 0)
+    - entropy too high/low (relative entropy out of [0.05, 0.2])
+    - frozen updates (KL < 0.001 or clipfrac < 0.05)
+    Adds text summaries to TensorBoard as well.
+    """
+
+    def __init__(self, action_space_size, verbose=1):
+        super(PPODiagnosticsCallback, self).__init__(verbose)
+        self.A = float(action_space_size)
+        self.warning_log = []
+        self.logger_ref = None  # Will be set during training
+
+    def _init_callback(self):
+        # Called once training starts — model.logger now exists
+        self.logger_ref = getattr(self.model, "logger", None)
+
+    def _record_warning(self, message):
+        """Add warning to rolling log + TensorBoard."""
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        full_msg = f"[{timestamp}] {message}"
+        self.warning_log.append(full_msg)
+        self.warning_log = self.warning_log[-15:]  # keep last 15 warnings
+
+        # Print to console
+        if self.verbose > 0:
+            print(f"\033[93m⚠️ {full_msg}\033[0m")
+
+        # Log to TensorBoard if available
+        if self.logger_ref is not None:
+            tb_text = "\n".join(self.warning_log)
+            self.logger_ref.record("diagnostics/warnings_text", tb_text)
+
+    def _on_step(self) -> bool:
+        if self.logger_ref is None:
+            return True  # Skip until logger is ready
+
+        logs = getattr(self.logger_ref, "name_to_value", {}) or {}
+
+        ev = logs.get("train/explained_variance")
+        ent = logs.get("loss/entropy_loss")
+        kl = logs.get("loss/approximate_kullback-leibler")
+        clipfrac = logs.get("loss/clip_factor")
+
+        # ---- Critic health ----
+        if ev is not None and ev < 0:
+            self._record_warning(f"Critic collapse detected (EV={ev:.3f})")
+
+        # ---- Entropy checks ----
+        if ent is not None:
+            rel_ent = ent / math.log(self.A)
+            self.logger_ref.record("diagnostics/relative_entropy", rel_ent)
+            if rel_ent > 0.3:
+                self._record_warning(f"Entropy too high (rel={rel_ent:.2f}) — reduce ent_coef")
+            elif rel_ent < 0.03:
+                self._record_warning(f"Entropy too low (rel={rel_ent:.2f}) — exploration dying")
+
+        # ---- PPO update health ----
+        if kl is not None and kl < 0.001:
+            self._record_warning(f"PPO nearly frozen (KL={kl:.4f})")
+
+        if clipfrac is not None and clipfrac < 0.05:
+            self._record_warning(f"Updates too conservative (clipfrac={clipfrac:.3f})")
+
+        return True
+
+
 def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, weight_path='',
                           fix_index_count=0, dmx_sz=0,
                           test_workload_from_file='', test_workload_qids='', newf=False,
-                          input_workload: Workload=None, random_seed=0, shuffle=False, debug_print=False,
+                          input_workload: Workload=None,
+                          random_seed=0, shuffle=False, debug_print=False,
                           cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
-                          tb_log_path=''):
+                          tb_log_path='',
+                          lr=0.00025, ec=0.01, cr=0.2, ns=128, gamma=0.99):
     CONFIGURATION_FILE = configuration_file
     if tb_log_path  == 'None':
         tb_log_path = None
@@ -33,11 +108,12 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
     if test_only:
         experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts,
                 newf=newf, random_seed=random_seed, debug_print=debug_print, dmx_sz=dmx_sz,
-                cli_disable_precedent_masking=cli_disable_precedent_masking, cli_enable_precedent_masking=cli_enable_precedent_masking)
+                cli_disable_precedent_masking=cli_disable_precedent_masking, cli_enable_precedent_masking=cli_enable_precedent_masking,
+                lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma)
         import os
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
-        experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle)
+        experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle, input_workload_path=test_workload_from_file)
         if input_workload:
             input_qids = [q.nr  for q in input_workload.queries]
         else:
@@ -124,7 +200,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
     else:
         experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, dmx_sz=dmx_sz,
                     random_seed=random_seed, debug_print=debug_print, cli_disable_precedent_masking=cli_disable_precedent_masking,
-                    cli_enable_precedent_masking=cli_enable_precedent_masking)
+                    cli_enable_precedent_masking=cli_enable_precedent_masking,
+                    lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma)
 
         if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
             from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
@@ -149,7 +226,9 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             [experiment.make_env(env_id) for env_id in range(experiment.config["parallel_environments"])]
         )
         training_env = VecNormalize(
-            training_env, norm_obs=True, norm_reward=True, gamma=experiment.config["rl_algorithm"]["gamma"], training=True
+            training_env, norm_obs=True, norm_reward=True, gamma=experiment.config["rl_algorithm"]["gamma"], training=True,
+            clip_obs=10.,
+            # clip_reward=10.
         )
         temac = []
 
@@ -225,7 +304,9 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             deterministic=True,
             comparison_performances=experiment.comparison_performances["validation"],
         )
-        callbacks = [validation_callback, test_callback]
+        diag_callback = PPODiagnosticsCallback(action_space_size=training_env.action_space.n)
+
+        callbacks = [validation_callback, test_callback, diag_callback]
 
         if len(experiment.multi_validation_wl) > 0:
             callback_multi_validation_env = VecNormalize(
@@ -277,6 +358,7 @@ if __name__ == "__main__":
     parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
     parser.add_argument('--uni_freq', action='store_true', default=True)
     # parser.add_argument('--weight_path', type=str, default='query_files/tpch12/weight1.pkl')
+    # parser.add_argument('--weight_path', type=str, default='query_files/TPCHC/varied_weights.pkl')
     parser.add_argument('--weight_path', type=str, default='')
     parser.add_argument('--shuffle', action='store_true', default=False)
     parser.add_argument('--fix_index_count', type=int, default=0)
@@ -289,6 +371,11 @@ if __name__ == "__main__":
     parser.add_argument('--enable-precedent-masking', action='store_const', const=False, default=None, help='Enable precedent masking')
     parser.add_argument('--dmx_sz', type=int, default=0)
     parser.add_argument('--tb_log', type=str, default='tensor_log')
+    parser.add_argument('--lr', type=float, default=-1)
+    parser.add_argument('--ns', type=int, default=-1)
+    parser.add_argument('--ec', type=float, default=-1)
+    parser.add_argument('--cr', type=float, default=-1)
+    parser.add_argument('--gamma', type=float, default=-1)
     args = parser.parse_args()
 
     if args.config:
@@ -308,5 +395,6 @@ if __name__ == "__main__":
                             newf=args.newf, shuffle=args.shuffle, debug_print=args.debug_print,
                             cli_disable_precedent_masking=args.disable_precedent_masking,
                             cli_enable_precedent_masking=args.enable_precedent_masking,
-                            tb_log_path = args.tb_log)
+                            tb_log_path = args.tb_log,
+                            lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma)
 

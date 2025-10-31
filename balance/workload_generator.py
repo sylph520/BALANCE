@@ -21,13 +21,21 @@ from .workload_embedder import WorkloadEmbedder
 
 QUERY_PATH = "query_files"
 
+def get_query_texts_from_file(file: str):
+    with open(file, 'r') as f:
+        sqls = f.readlines()
+    if sqls[-1] == '':
+        sqls.pop()
+    return sqls
+
 
 class WorkloadGenerator(object):
     def __init__(
         self, wk_config, workload_columns, random_seed, database_name, experiment_id=None,
         filter_utilized_columns=None,experiment_folder_path=None,spath=None,
         tpl2tid={}, dummy=False,
-        input_workload=None, weight_path='',shuffle=False
+        input_workload=None, input_worklod_path='',
+        weight_path='',shuffle=False
     ):
         self.benchmark = wk_config["benchmark"]
         assert self.benchmark  in [
@@ -36,6 +44,7 @@ class WorkloadGenerator(object):
             "JOB",
             "TPCHC",
             "TPCDSC",
+            "CEB"
         ], f"Benchmark '{self.benchmark}' is currently not supported."
 
         # For create view statement differentiation
@@ -64,8 +73,10 @@ class WorkloadGenerator(object):
 
         # self.query_texts is list of lists. Outer list for query classes, inner list for instances of this class.
         #self.query_texts = self._retrieve_query_texts()
-        if not input_workload:
+        if not input_workload and not input_worklod_path:
             self.query_texts = self._retrieve_query_texts_random_value()
+        elif input_worklod_path:
+            self.query_texts = [[qstr] for qstr in get_query_texts_from_file(input_worklod_path)]
         else:
             self.query_texts = [[q.text] for q in input_workload.queries]
         self.query_classes = set(range(1, self.number_of_query_classes + 1))
@@ -230,14 +241,23 @@ class WorkloadGenerator(object):
         else:
             self.wl_validation = [None]
             self.wl_testing = [None]
-            if not input_workload:
+            if not input_workload and not input_worklod_path:
                 self.wl_training, self.wl_validation[0], self.wl_testing[0] = self._generate_workloads(
                             wk_config["training_instances"], validation_instances, test_instances, wk_config["size"],
                             weight_path=weight_path, shuffle=shuffle
                     )
             else:
                 workload_class_order, workload_class_freq = self._generate_random_workload(wk_config["size"], weight_path=weight_path, shuffle=shuffle)
-                input_workload.queries =  [input_workload.queries[workload_class_order[i]-1] for i in  range(wk_config['size'])]
+                if input_workload:
+                    input_workload.queries =  [input_workload.queries[workload_class_order[i]-1] for i in  range(wk_config['size'])]
+                else:
+                    queries = []
+                    for i in range(wk_config['size']):
+                        q = Query(query_id=i+1,query_text= self.query_texts[i][0], frequency=workload_class_freq[i])
+                        self._store_indexable_columns(q)
+                        queries.append(q)
+                    input_workload = Workload(queries)
+
                 self.wl_training = [input_workload]
                 self.wl_validation = [[input_workload]]
                 self.wl_testing = [[input_workload]]
@@ -280,6 +300,8 @@ class WorkloadGenerator(object):
         elif self.benchmark == "TPCDSC":
             return 20
         elif self.benchmark == "JOB":
+            return 113  # return 113
+        elif self.benchmark == "CEB":
             return 16  # return 113
         else:
             raise ValueError("Unsupported Benchmark type provided, only TPCH, TPCDS, and JOB supported.")
