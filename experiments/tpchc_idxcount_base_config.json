@@ -2,7 +2,7 @@
   "id": "tpchc_live_test",
   "description": "A short, live test for the custom TPCHC workload.",
   "gym_version": 1,
-  "timesteps":16000,
+  "timesteps": 16000,
   "database": "tpch_1_lhr",
   "random_seed": 60,
   "parallel_environments": 1,
