@@ -533,8 +533,8 @@ class PPO2(ActorCriticRLModel):
             "seed": self.seed,
             "_vectorize_action": self._vectorize_action,
             "policy_kwargs": self.policy_kwargs,
-            #"act_len": len(self.actor),
-            "pact_len": self.env.envs[0].observation_space.shape[0]
+            # "act_len": len(self.actor),
+            "pact_len": self.observation_space.shape[0]
         }
 
         params_to_save = self.get_parameters()

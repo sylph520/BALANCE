@@ -128,7 +128,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                           cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
                           tb_log_path='',
                           lr=0.00025, ec=0.01, cr=0.2, ns=128, gamma=0.99,
-                          dump_initial_config=True):
+                          dump_initial_config=True, num_parallel_env=-1):
     CONFIGURATION_FILE = configuration_file
     if tb_log_path  == 'None':
         tb_log_path = None
@@ -232,7 +232,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, dmx_sz=dmx_sz,
                     random_seed=random_seed, debug_print=debug_print, cli_disable_precedent_masking=cli_disable_precedent_masking,
                     cli_enable_precedent_masking=cli_enable_precedent_masking,
-                    lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma)
+                    lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma, num_parallel_env=num_parallel_env)
 
         if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
             from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
@@ -390,7 +390,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             experiment.dump_config_snapshot(tb_run_dir)
 
         with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
-            pickle.dump([training_env.venv.envs[0].dic, callbacks[0].eval_env.venv.envs[0].dic, callbacks[1].eval_env.venv.envs[0].dic], handle, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump([training_env.get_attr("dic")[0], callbacks[0].eval_env.get_attr("dic")[0], callbacks[1].eval_env.get_attr("dic")[0]], handle, protocol=pickle.HIGHEST_PROTOCOL)
         experiment.finishmy()
 
         return experiment.experiment_folder_path
@@ -419,6 +419,7 @@ if __name__ == "__main__":
     parser.add_argument('--dmx_sz', type=int, default=0)
     parser.add_argument('--tb_log', type=str, default='tensor_log')
     parser.add_argument('--skip_initial_config_dump', action='store_true', help='Skip writing pre-training config snapshots.')
+    parser.add_argument('--num_parallel_env', type=int, default=-1, help='Overwrite the number of parallel environments in the config file.')
     parser.add_argument('--lr', type=float, default=-1)
     parser.add_argument('--ns', type=int, default=-1)
     parser.add_argument('--ec', type=float, default=-1)
@@ -445,4 +446,5 @@ if __name__ == "__main__":
                             cli_enable_precedent_masking=args.enable_precedent_masking,
                             tb_log_path = args.tb_log,
                             lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma,
-                            dump_initial_config=not args.skip_initial_config_dump)
+                            dump_initial_config=not args.skip_initial_config_dump,
+                            num_parallel_env=args.num_parallel_env)
