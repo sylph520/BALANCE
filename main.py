@@ -207,10 +207,26 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         folder_path = experiment.experiment_folder_path
 
         if os.path.exists(folder_path):
-            if not model_path:
-                model_path = os.path.join(folder_path, "final_model.zip")
-            if os.path.exists(model_path):
-                logging.info(f"Loading model from: {model_path}")
+            tb_run_dir = None
+            tb_base_path = tb_log_path if tb_log_path else "tensor_log"
+            tb_log_name = 'tblog_' + folder_path.strip('/').split('/')[-1]
+            if tb_base_path:
+                latest_run_id = _get_latest_tb_run_id(tb_base_path, tb_log_name)
+                candidate_tb_dir = os.path.join(tb_base_path, f"{tb_log_name}_{latest_run_id}")
+                if os.path.isdir(candidate_tb_dir):
+                    tb_run_dir = candidate_tb_dir
+
+            candidate_model_paths = []
+            if model_path:
+                candidate_model_paths.append(model_path)
+            if tb_run_dir:
+                candidate_model_paths.append(os.path.join(tb_run_dir, "final_model.zip"))
+            candidate_model_paths.append(os.path.join(folder_path, "final_model.zip"))
+
+            resolved_model_path = next((p for p in candidate_model_paths if p and os.path.exists(p)), None)
+
+            if resolved_model_path:
+                logging.info(f"Loading model from: {resolved_model_path}")
                 if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
                     from stable_baselines.ppo2 import ppo2
                     algorithm_class = ppo2.PPO2
@@ -220,7 +236,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                     raise ValueError
 
                 experiment.start_learning()
-                model = experiment.model_type.load(model_path)
+                model = experiment.model_type.load(resolved_model_path)
                 experiment.set_model(model)
 
                 if test_workload_from_file:
@@ -253,8 +269,14 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                         logging.info("Using default test workload from configuration.")
                         test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
 
-                vec_norm_path = os.path.join(folder_path, "vec_normalize.pkl")
-                if os.path.exists(vec_norm_path):
+                vec_candidates = []
+                if tb_run_dir:
+                    vec_candidates.append(os.path.join(tb_run_dir, "vec_normalize.pkl"))
+                vec_candidates.append(os.path.join(folder_path, "vec_normalize.pkl"))
+
+                vec_norm_path = next((p for p in vec_candidates if os.path.exists(p)), None)
+
+                if vec_norm_path:
                     logging.info(f"Loading normalization statistics from: {vec_norm_path}")
                     test_env = VecNormalize.load(vec_norm_path, test_env_dummy)
                     test_env.training = False
@@ -285,7 +307,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 return experiment.experiment_folder_path
                 # exit(0)
             else:
-                logging.warning(f"No saved model found at {model_path}")
+                logging.warning("No saved model artifacts found. Checked paths: %s", candidate_model_paths)
                 raise ValueError
         else:
             logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
@@ -445,6 +467,24 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         )
         if tb_run_dir:
             os.makedirs(tb_run_dir, exist_ok=True)
+            model_artifacts = [
+                fname
+                for fname in os.listdir(experiment.experiment_folder_path)
+                if fname.endswith(".zip")
+            ]
+            for artifact in model_artifacts:
+                src = os.path.join(experiment.experiment_folder_path, artifact)
+                dst = os.path.join(tb_run_dir, artifact)
+                try:
+                    shutil.copy2(src, dst)
+                except Exception as exc:
+                    logging.warning("Failed to copy model artifact %s to TensorBoard dir %s: %s", artifact, tb_run_dir, exc)
+            vec_normalize_path = os.path.join(experiment.experiment_folder_path, "vec_normalize.pkl")
+            if os.path.exists(vec_normalize_path):
+                try:
+                    shutil.copy2(vec_normalize_path, os.path.join(tb_run_dir, "vec_normalize.pkl"))
+                except Exception as exc:
+                    logging.warning("Failed to copy vec_normalize.pkl to TensorBoard dir %s: %s", tb_run_dir, exc)
             if dump_initial_config:
                 initial_src = os.path.join(experiment.experiment_folder_path, "config.initial.json")
                 if os.path.exists(initial_src):
