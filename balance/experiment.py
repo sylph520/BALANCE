@@ -95,8 +95,8 @@ class Experiment(object):
             # If no CLI flag, use the value from the config file (which defaults to True)
             self.config['disable_precedent_masking'] = config_disable_precedent_masking
 
-        constraint_type = self.config.get("constraint_type", "storage"),
-        constraint_value = self.config.get("constraint_value", None),
+        constraint_type = self.config.get("constraint_type", "storage")
+        constraint_value = self.config.get("constraint_value", None)
         if constraint_type == 'count':
             if fix_index_count:
                 self.fix_index_count = fix_index_count
