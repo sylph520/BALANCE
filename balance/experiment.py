@@ -35,36 +35,53 @@ class DummyWorkloadGenerator:
         self.number_of_query_classes = number_of_query_classes
 
 class Experiment(object):
-    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False, uni_freq=False, fix_index_count=0, dmx_sz=0,
-                ts=0, lsi_dimension=None, newf=False, random_seed=None, debug_print=False,
+    def __init__(self, configuration_file, aa=None, id=None, skip_folder_creation=False,
+                uni_freq=None, fix_index_count=0, dmx_sz=0,
+                ts=0, lsi_dimension=None, newf=None, random_seed=None, debug_print=False,
                 cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
                 lr=-1, ec=-1, cr=-1, ns=-1, gamma=-1, num_parallel_env=-1):
         """
         setup the experiment from configuration, random seed, and related method info
         """
+        self.rnd = random.Random()
+        self.rnd.seed(self.config["random_seed"])
+
         self._init_times()
         self.skip_folder_creation = skip_folder_creation
 
         cp = ConfigurationParser(configuration_file)
         self.config = cp.config
+
+        self.config['random_seed'] = random_seed
         self.config['debug_print'] = debug_print
-        if lr > 0:
-            self.config['rl_algorithm']["args"]['learning_rate']=lr
+
+        if ts:
+            self.config['timesteps'] = ts
         if gamma > 0:
-            self.config['rl_algorithm']['gamma']=gamma
+            self.config["rl_algorithm"]["gamma"] = gamma
+            self.gamma = gamma
+        if lr > 0:
+            self.config["rl_algorithm"]["args"]["learning_rate"] = lr
         if ec > 0:
-            self.config['rl_algorithm']["args"]['ent_coef']=ec
+            self.config["rl_algorithm"]["args"]["ent_coef"] = ec
         if cr > 0:
-            self.config['rl_algorithm']["args"]['cliprange']=cr
+            self.config["rl_algorithm"]["args"]["cliprange"] = cr
         if ns > 0:
-            self.config['rl_algorithm']["args"]['n_steps']=ns
+            self.config["rl_algorithm"]["args"]["n_steps"] = ns
+        if dmx_sz:
+            self.config['workload_embedder']['representation_size'] = dmx_sz
+        if uni_freq:
+            self.config['workload']['varying_frequencies'] = not uni_freq
+        if newf:
+            self.config['use_new_box_line_format'] = newf 
+
+        self.id = self.config["id"]
 
         if num_parallel_env != -1:
             self.config["parallel_environments"] = num_parallel_env
+            logging.INFO(f"parallev env num overwriten from {self.config['parallel_environment']} to {num_parallel_env}")
 
-        # Get value from config file, default to True if not present
         config_disable_precedent_masking = self.config.get('disable_precedent_masking', True)
-
         # Handle disable_precedent_masking with CLI precedence
         if cli_disable_precedent_masking is True:
             self.config['disable_precedent_masking'] = True
@@ -73,25 +90,16 @@ class Experiment(object):
         else:
             # If no CLI flag, use the value from the config file (which defaults to True)
             self.config['disable_precedent_masking'] = config_disable_precedent_masking
-        self.config['random_seed'] = random_seed
-        self.fix_index_count = fix_index_count
-        if fix_index_count:
-            self.fix_index_count = fix_index_count
 
-        if uni_freq:
-            self.config['workload']['varying_frequencies'] = False
+        constraint_type = self.config.get("constraint_type", "storage"),
+        constraint_value = self.config.get("constraint_value", None),
+        if constraint_type == 'count':
+            if fix_index_count:
+                self.fix_index_count = fix_index_count
+            else:
+                self.fix_index_count = constraint_value
         else:
-            self.config['workload']['varying_frequencies'] = True
-
-        if newf:
-            self.config['use_new_box_line_format'] = True
-        else:
-            self.config['use_new_box_line_format'] = False
-        # __import__('ipdb').set_trace()
-        if ts:
-            self.config['timesteps'] = ts
-        if dmx_sz:
-            self.config['workload_embedder']['representation_size'] = dmx_sz
+            self.fix_index_count = None
 
         if aa!=None:
             self.config["id"] = "TPCDS_depart_unknow_"+aa
@@ -100,21 +108,13 @@ class Experiment(object):
             self.config["id"] = id
         if lsi_dimension:
             self.config["workload_embedder"]["representation_size"] = lsi_dimension
+
         self._set_sb_version_specific_methods()
 
-        self.id = self.config["id"]
         self.cmp_runtime = datetime.timedelta(0)
         self.dataset_size = None
         self.model = None
         self.model_pool = []
-        # self.Smodel_1 = None
-        # self.Smodel_2 = None
-        # self.Smodel_3 = None
-        # self.Smodel_4 = None
-        # self.Smodel_5 = None
-        # self.Smodel_6 = None
-        self.rnd = random.Random()
-        self.rnd.seed(self.config["random_seed"])
 
         self.comparison_performances = {
             "test": {"Extend": [], "DB2Adv": []},
@@ -139,7 +139,10 @@ class Experiment(object):
             content = f.read()
 
         # Step 1: Load all queries from the file and create a pool, indexed by their file order (1-based).
-        sql_statements = [s.strip() for s in sqlparse.split(content) if s.strip()]
+        if ';' in content:
+            sql_statements = [s.strip() for s in sqlparse.split(content) if s.strip()]
+        else:
+            sql_statements = content.split('\n')
         query_pool = {}
         for i, sql in enumerate(sql_statements):
             query_nr = i + 1 # Assign ID 1, 2, 3, ... based on file order
@@ -179,8 +182,7 @@ class Experiment(object):
             self.config["column_filters"]
         )  # setup schema and reduce columns with small rows
 
-        if False:
-        # if self.config.get("load_workloads_from_file"):
+        if self.config.get("load_workloads_from_file"):  # pickle file
             with open(self.config["load_workloads_from_file"], "rb") as f:
                 chunk_workloads = pickle.load(f)
 
@@ -460,15 +462,19 @@ class Experiment(object):
         self.training_end_time = None
 
     def _create_experiment_folder(self):
+        """
+        setup self.experiment_folder_path wrt config values and refresh the experiment folder if training
+        """
         assert os.path.isdir(
             self.EXPERIMENT_RESULT_PATH
-        ), f"Folder for experiment results should exist at: ./"
+        ), "Folder for experiment results should exist at: ./"
 
-        # __import__('ipdb').set_trace()
         # self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}"
+        # experiment_folder_path2 = setup_exp_folder(self.EXPERIMENT_RESULT_PATH, self.id, self.config['workload']['benchmark'], self.config['timesteps'],
+        #                                 dmxsz=self.config['workload_embedder']['representation_size'],fix_index_count=self.fix_index_count, config=self.config)
         self.experiment_folder_path = f"{self.EXPERIMENT_RESULT_PATH}/ID_{self.id}_{self.config['workload']['benchmark']}_ts{self.config['timesteps']}"
         self.experiment_folder_path += f"_dmxsz{self.config['workload_embedder']['representation_size']}"
-        rl_suffix = self._build_rl_suffix()
+        rl_suffix = _build_rl_suffix(self.config['rl_algorithm'])
         if rl_suffix:
             self.experiment_folder_path += f"_{rl_suffix}"
 
@@ -478,7 +484,6 @@ class Experiment(object):
             self.experiment_folder_path += '_uniFreq'
         if self.fix_index_count:
             self.experiment_folder_path += f'_idxmax{self.fix_index_count}'
-
         if not self.config['disable_precedent_masking']:
             self.experiment_folder_path += 'ONprecedentMasking'
         else:
@@ -488,7 +493,7 @@ class Experiment(object):
 
         # Only delete and recreate folder if not in test mode
         if not getattr(self, 'skip_folder_creation', False):
-            if(os.path.isdir(self.experiment_folder_path) == True):
+            if(os.path.isdir(self.experiment_folder_path)):
                 shutil.rmtree(self.experiment_folder_path, ignore_errors=True)
             os.mkdir(self.experiment_folder_path)
         else:
@@ -496,46 +501,6 @@ class Experiment(object):
             if not os.path.exists(self.experiment_folder_path):
                 os.makedirs(self.experiment_folder_path, exist_ok=True)
 
-    def _build_rl_suffix(self):
-        rl_cfg = self.config.get("rl_algorithm", {}) or {}
-        suffix_tokens = []
-
-        algo = rl_cfg.get("algorithm")
-        if algo:
-            suffix_tokens.append(self._sanitize_token(algo))
-
-        args = rl_cfg.get("args", {}) or {}
-        for key in sorted(args.keys()):
-            value = args[key]
-            suffix_tokens.append(
-                f"{self._sanitize_token(key)}{self._sanitize_token(self._format_value(value))}"
-            )
-
-        if "gamma" in rl_cfg:
-            suffix_tokens.append(
-                f"gamma{self._sanitize_token(self._format_value(rl_cfg['gamma']))}"
-            )
-
-        return "-".join(suffix_tokens)
-
-    @staticmethod
-    def _format_value(value):
-        if isinstance(value, float):
-            return f"{value:.6g}"
-        return str(value)
-
-    @staticmethod
-    def _sanitize_token(text):
-        text = str(text)
-        text = text.replace(" ", "")
-        text = text.replace("/", "_")
-        text = text.replace("\\", "_")
-        text = text.replace(":", "_")
-        text = text.replace(",", "_")
-        text = text.replace(".", "p")
-        text = text.replace("-", "m")
-        text = re.sub(r"[^A-Za-z0-9_]+", "", text)
-        return text
 
     def _write_report(self,dbname):
         with open(f"{self.experiment_folder_path}/report_ID_{self.id}_{dbname}.txt", "w") as f:
@@ -949,7 +914,7 @@ class Experiment(object):
 
         return episode_performances, mean_performance, perfs
 
-    def make_env(self, env_id, environment_type=EnvironmentType.TRAINING, workloads_in=None):
+    def make_env(self, env_id, environment_type=EnvironmentType.TRAINING, workloads_in=None, reward_scale=1.0):
         def _init():
             action_manager_class = getattr(
                 importlib.import_module("balance.action_manager"), self.config["action_manager"]
@@ -1021,8 +986,9 @@ class Experiment(object):
                     "env_id": env_id,
                     "similar_workloads": self.config["workload"]["similar_workloads"],
                     "ids": self.config["id"],
-                    "constraint_type": self.config.get("constraint_type", "storage"),
-                    "constraint_value": self.config.get("constraint_value", None),
+                    "constraint_type": constraint_type,
+                    "constraint_value": constraint_value,
+                    "reward_scale": reward_scale,
                 },
             )
             return env
@@ -1062,3 +1028,62 @@ class Experiment(object):
             self.sync_envs_normalization = sync_envs_normalization_sb3
         else:
             raise ValueError("There are only versions 2 and 3 of StableBaselines.")
+
+
+def _build_rl_suffix(rl_cfg):
+    suffix_tokens = []
+
+    algo = rl_cfg.get("algorithm")
+    if algo:
+        suffix_tokens.append(_sanitize_token(algo))
+
+    args = rl_cfg.get("args", {}) or {}
+    for key in sorted(args.keys()):
+        value = args[key]
+        suffix_tokens.append(
+            f"{_sanitize_token(key)}{_sanitize_token(_format_value(value))}"
+        )
+
+    if "gamma" in rl_cfg:
+        suffix_tokens.append(
+            f"gamma{_sanitize_token(_format_value(rl_cfg['gamma']))}"
+        )
+
+    return "-".join(suffix_tokens)
+
+def _format_value(value):
+    if isinstance(value, float):
+        return f"{value:.6g}"
+    return str(value)
+
+def _sanitize_token(text):
+    text = str(text)
+    text = text.replace(" ", "")
+    text = text.replace("/", "_")
+    text = text.replace("\\", "_")
+    text = text.replace(":", "_")
+    text = text.replace(",", "_")
+    text = text.replace(".", "p")
+    text = text.replace("-", "m")
+    text = re.sub(r"[^A-Za-z0-9_]+", "", text)
+    return text
+
+def setup_exp_folder(EXPERIMENT_RESULT_PATH, id, bm, ts, dmxsz, fix_index_count, config):
+    experiment_folder_path = f"{EXPERIMENT_RESULT_PATH}/ID_{id}_{bm}_ts{ts}"
+    experiment_folder_path += f"_dmxsz{dmxsz}"
+    rl_suffix = _build_rl_suffix(config['rl_algorithm'])
+    if rl_suffix:
+        experiment_folder_path += f"_{rl_suffix}"
+
+    if config['workload']['varying_frequencies']:
+        experiment_folder_path += '_varyFreq'
+    else:
+        experiment_folder_path += '_uniFreq'
+    if fix_index_count:
+        experiment_folder_path += f'_idxmax{fix_index_count}'
+
+    if not config['disable_precedent_masking']:
+        experiment_folder_path += 'ONprecedentMasking'
+    else:
+        experiment_folder_path += 'OFFprecedentMasking'
+    return experiment_folder_path

@@ -5,7 +5,7 @@
   "timesteps": 16000,
   "database": "indexselection_job___1",
   "random_seed": 60,
-  "parallel_environments": 1,
+  "parallel_environments": 8,
   "pickle_cost_estimation_caches": false,
   "action_manager": "MultiColumnIndexActionManager",
   "observation_manager": "SingleColumnIndexPlanEmbeddingObservationManagerWithCost",
@@ -36,6 +36,15 @@
       ]
     },
     "args": {
+		"learning_rate": 0.0001,
+		"n_steps": 1024,
+		"nminibatches": 8,
+		"noptepochs": 8,
+		"ent_coef": 0.0001,
+		"vf_coef": 1.0,
+		"lam":0.9,
+		"cliprange": 0.3,
+		"max_grad_norm": 0.5
     }
   },
   "workload": {
@@ -53,7 +62,7 @@
     "excluded_query_classes": [],
     "unknown_queries": 0
   },
-  "comparison_algorithms": ["extend", "db2advis"],
+  "comparison_algorithms": [],
   "budgets": {
     "training": false,
     "validation_and_testing": [3, 5, 7, 10, 12, 15]

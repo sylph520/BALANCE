@@ -90,6 +90,50 @@ class PPODiagnosticsCallback(BaseCallback):
 
         return True
 
+class VecNormDiagCallback(BaseCallback):
+    """
+    Print VecNormalize stats every few updates.
+    """
+    def __init__(self, check_freq=5000, verbose=0):
+        super(VecNormDiagCallback, self).__init__(verbose)
+        self.check_freq = check_freq
+
+    def _on_step(self):
+        # 'self.training_env' is VecNormalize(env, ...)
+        if self.num_timesteps % self.check_freq == 0:
+            try:
+                vec = self.training_env
+                print(f"\n[Diag] step={self.num_timesteps}")
+                print("Reward RMS mean:", vec.ret_rms.mean)
+                print("Reward RMS var :", vec.ret_rms.var)
+                print("Obs RMS mean:", vec.obs_rms.mean.mean())
+                print("Obs RMS var :", vec.obs_rms.var.mean())
+            except Exception as e:
+                print("[Diag] Could not read VecNormalize stats:", e)
+        return True
+
+class EntropySchedulerCallback(BaseCallback):
+    """
+    CORRECTED: A custom callback that linearly decays the entropy coefficient (ent_coef)
+    by directly accessing the model.ent_coef attribute, which is correct for PPO2 in SB2.
+    """
+    def __init__(self, start_value, end_value, total_timesteps, verbose=0):
+        super(EntropySchedulerCallback, self).__init__(verbose)
+        self.start_value = start_value
+        self.end_value = end_value
+        self.total_timesteps = total_timesteps
+
+    def _on_step(self) -> bool:
+        # Calculate the fraction of total training completed
+        progress = self.num_timesteps / self.total_timesteps
+        
+        # Linear decay formula
+        new_ent_coef = self.start_value - (self.start_value - self.end_value) * progress
+        
+        # **CORRECTED ACTION:** Set the new entropy coefficient by modifying the attribute directly
+        self.model.ent_coef = new_ent_coef
+
+        return True # Continue training
 
 def _get_latest_tb_run_id(log_path, log_name):
     if not log_path or not log_name:
@@ -127,14 +171,23 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                           random_seed=0, shuffle=False, debug_print=False,
                           cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
                           tb_log_path='',
-                          lr=0.00025, ec=0.01, cr=0.2, ns=128, gamma=0.99,
-                          dump_initial_config=True, num_parallel_env=-1):
+                        #   lr=0.00025, ec=.01, cr=0.2, ns=128, gamma=0.99,
+                          lr=-1, ec=-1, cr=-1, ns=-1, gamma=-1,
+                          dump_initial_config=True, num_parallel_env=-1,
+                          model_path='',
+                          reward_scale=1.0):
     CONFIGURATION_FILE = configuration_file
     if tb_log_path  == 'None':
         tb_log_path = None
+    else:
+        tb_log_path = tb_log_path
     np.random.seed(random_seed)
     random.seed(random_seed)
-    tb_log_path = tb_log_path
+
+    if weight_path:
+        uni_freq = False
+    else:
+        uni_freq = True
 
     logging.warning("use gpu:" + use_gpu)
     if test_only:
@@ -154,7 +207,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         folder_path = experiment.experiment_folder_path
 
         if os.path.exists(folder_path):
-            model_path = os.path.join(folder_path, "final_model.zip")
+            if not model_path:
+                model_path = os.path.join(folder_path, "final_model.zip")
             if os.path.exists(model_path):
                 logging.info(f"Loading model from: {model_path}")
                 if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
@@ -186,12 +240,15 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                     custom_wl = True
                     if custom_wl:
                         logging.info("Using custom hardcoded test workload.")
-                        if not uni_freq:
-                            test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
+                        if input_workload:
+                            test_wl = input_workload
                         else:
-                            test_wl = experiment.workload_generator._workloads_from_tuples([tuple((input_qids, [1]*20))])[0]
-                        test_wl.budget = 3
-                        test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
+                            if not uni_freq:
+                                test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
+                            else:
+                                test_wl = experiment.workload_generator._workloads_from_tuples([tuple((input_qids, [1]*20))])[0]
+                        test_wl.budget = fix_index_count
+                        test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl], reward_scale=reward_scale)])
                     else:
                         logging.info("Using default test workload from configuration.")
                         test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
@@ -209,29 +266,35 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                         norm_obs=True,
                         norm_reward=False,
                         gamma=experiment.config["rl_algorithm"]["gamma"],
-                        training=False
+                        training=False,
                     )
                 model.set_env(test_env)
+                rec_start_time = datetime.datetime.now()
                 training_env = model.get_vec_normalize_env()
                 if training_env is not None:
                     experiment.sync_envs_normalization(training_env, test_env)
 
                 n_eval_episodes = experiment.config["workload"]["validation_testing"]["number_of_workloads"]
                 episode_performances = experiment._evaluate_model(model, test_env, n_eval_episodes)
+                rec_end_time = datetime.datetime.now()
                 logging.info(f"Evaluation completed. Performance: {episode_performances}")
-                print(f"Mean performance: {episode_performances[1]:.2f}")
+                print(f"Final Mean IR: {100 - episode_performances[1]:.2f}")
                 experiment.training_end_time = datetime.datetime.now()
-                experiment.finishmy()
+                print(f"rectime is {(rec_end_time - rec_start_time).total_seconds() * 1000}")
+                # experiment.finishmy()
                 return experiment.experiment_folder_path
                 # exit(0)
             else:
-                logging.warning(f"No saved model found at {model_path}, proceeding with training")
+                logging.warning(f"No saved model found at {model_path}")
+                raise ValueError
         else:
             logging.warning(f"No experiment folders found for {experiment_base_name}, proceeding with training")
+            raise ValueError
     else:
         experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, dmx_sz=dmx_sz,
                     random_seed=random_seed, debug_print=debug_print, cli_disable_precedent_masking=cli_disable_precedent_masking,
                     cli_enable_precedent_masking=cli_enable_precedent_masking,
+                    skip_folder_creation=True,
                     lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma, num_parallel_env=num_parallel_env)
 
         if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
@@ -257,10 +320,11 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             [experiment.make_env(env_id) for env_id in range(experiment.config["parallel_environments"])]
         )
         training_env = VecNormalize(
-            training_env, norm_obs=True, norm_reward=True, gamma=experiment.config["rl_algorithm"]["gamma"], training=True,
-            clip_obs=10.,
-            # clip_reward=10.
+            training_env, gamma=experiment.gamma, training=True,
+            norm_obs=True, norm_reward=True,
+            clip_obs=10., clip_reward=10.
         )
+
         temac = []
 
         experiment.source_model_type = source_algorithm_class
@@ -276,7 +340,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 env=training_env,
                 verbose=2,
                 seed=experiment.config["random_seed"],
-                gamma=experiment.config["rl_algorithm"]["gamma"],
+                gamma=experiment.gamma,
                 tensorboard_log=tb_log_path,
                 acc=temac,
                 policy_kwargs=copy.copy(
@@ -290,7 +354,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 env=training_env,
                 verbose=2,
                 seed=experiment.config["random_seed"],
-                gamma=experiment.config["rl_algorithm"]["gamma"],
+                gamma=experiment.gamma,
                 tensorboard_log=tb_log_path,
                 policy_kwargs=copy.copy(
                     experiment.config["rl_algorithm"]["model_architecture"]
@@ -300,14 +364,13 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         logging.warning(f"Creating model with NN architecture: {experiment.config['rl_algorithm']['model_architecture']}")
 
         experiment.set_model(model)
-        tb_run_dir = None
         if dump_initial_config:
             experiment.dump_config_snapshot(experiment.experiment_folder_path, filename="config.initial.json")
+        tb_run_dir = None
 
         callback_test_env = VecNormalize(
             DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)]),
-            norm_obs=True,
-            norm_reward=False,
+            norm_obs=True, norm_reward=False,
             gamma=experiment.config["rl_algorithm"]["gamma"],
             training=False,
         )
@@ -315,16 +378,14 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             n_eval_episodes=experiment.config["workload"]["validation_testing"]["number_of_workloads"],
             eval_freq=round(experiment.config["validation_frequency"] / experiment.config["parallel_environments"]),
             eval_env=callback_test_env,
-            verbose=1,
-            name="test",
+            verbose=1, name="test",
             deterministic=True,
             comparison_performances=experiment.comparison_performances["test"],
         )
 
         callback_validation_env = VecNormalize(
             DummyVecEnv([experiment.make_env(0, EnvironmentType.VALIDATION)]),
-            norm_obs=True,
-            norm_reward=False,
+            norm_obs=True, norm_reward=False,
             gamma=experiment.config["rl_algorithm"]["gamma"],
             training=False,
         )
@@ -333,20 +394,25 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             eval_freq=round(experiment.config["validation_frequency"] / experiment.config["parallel_environments"]),
             eval_env=callback_validation_env,
             best_model_save_path=experiment.experiment_folder_path,
-            verbose=1,
-            name="validation",
+            verbose=1, name="validation",
             deterministic=True,
             comparison_performances=experiment.comparison_performances["validation"],
         )
         diag_callback = PPODiagnosticsCallback(action_space_size=training_env.action_space.n)
+        vecnormCallback = VecNormDiagCallback(check_freq=5000)
 
-        callbacks = [validation_callback, test_callback, diag_callback]
+        ent_callback = EntropySchedulerCallback(
+            start_value=0.001, 
+            end_value=0.00001, 
+            total_timesteps=experiment.config['timesteps'],
+        )
+        # callbacks = [validation_callback, test_callback, diag_callback, ent_callback]
+        callbacks = [validation_callback, test_callback, vecnormCallback]
 
         if len(experiment.multi_validation_wl) > 0:
             callback_multi_validation_env = VecNormalize(
                 DummyVecEnv([experiment.make_env(0, EnvironmentType.VALIDATION, experiment.multi_validation_wl)]),
-                norm_obs=True,
-                norm_reward=False,
+                norm_obs=True, norm_reward=False,
                 gamma=experiment.config["rl_algorithm"]["gamma"],
                 training=False,
             )
@@ -355,8 +421,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 eval_freq=round(experiment.config["validation_frequency"] / experiment.config["parallel_environments"]),
                 eval_env=callback_multi_validation_env,
                 best_model_save_path=experiment.experiment_folder_path,
-                verbose=1,
-                name="multi_validation",
+                verbose=1, name="multi_validation",
                 deterministic=True,
                 comparison_performances={},
             )
@@ -391,6 +456,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
 
         with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
             pickle.dump([training_env.get_attr("dic")[0], callbacks[0].eval_env.get_attr("dic")[0], callbacks[1].eval_env.get_attr("dic")[0]], handle, protocol=pickle.HIGHEST_PROTOCOL)
+
         experiment.finishmy()
 
         return experiment.experiment_folder_path
@@ -425,12 +491,13 @@ if __name__ == "__main__":
     parser.add_argument('--ec', type=float, default=-1)
     parser.add_argument('--cr', type=float, default=-1)
     parser.add_argument('--gamma', type=float, default=-1)
+    parser.add_argument('--reward_scale', type=float, default=1.0)
     args = parser.parse_args()
 
     if args.config:
         config_file = args.config
     else:
-        config_file = f"experiments/{(args.wk_type).lower()}.json"
+        config_file = f"experiments/{(args.wk_type).lower()}_conf/{(args.wk_type).lower()}.json"
 
     if args.weight_path:
         uni_freq_flag = False
@@ -447,4 +514,6 @@ if __name__ == "__main__":
                             tb_log_path = args.tb_log,
                             lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma,
                             dump_initial_config=not args.skip_initial_config_dump,
-                            num_parallel_env=args.num_parallel_env)
+                            num_parallel_env=args.num_parallel_env,
+                            reward_scale=args.reward_scale,
+                            model_path=args.load_model)

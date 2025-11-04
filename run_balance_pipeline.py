@@ -13,6 +13,7 @@ from index_selection_evaluation.selection.workload import Workload, Query
 from balance.schema import Schema
 from balance.workload_generator import WorkloadGenerator
 from balance.query_hasher import query_to_hash
+from balance.experiment import setup_exp_folder
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -26,6 +27,7 @@ def convert_dict_to_workload(workload_dict, workload_generator, unify_similar_op
         workload_generator._store_indexable_columns(query)
         queries.append(query)
     return Workload(queries)
+
 
 
 def main():
@@ -46,6 +48,8 @@ def main():
     parser.add_argument('--debug_print', action='store_true', help='Enable debug print statements')
     parser.add_argument('--disable_precedent_masking', action='store_const', const=True, default=None, help='Disable precedent masking')
     parser.add_argument('--enable-precedent-masking', action='store_const', const=False, default=None, help='Enable precedent masking')
+    parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
+    parser.add_argument('--tb_log', type=str, default='tensor_log')
     args = parser.parse_args()
 
     benchmark = args.bm
@@ -55,7 +59,7 @@ def main():
 
     # __import__('ipdb').set_trace()
 
-    base_config_path = f'experiments/{benchmark}_idxcount_base_config.json'
+    base_config_path = f'experiments/{benchmark}_conf/{benchmark}_idxcount_base_config.json'
 
     with open(base_config_path, 'r') as f:
         base_config = json.load(f)
@@ -82,6 +86,16 @@ def main():
         freq_label = 'uniFreq'
     else:
         freq_label = 'varyFreq'
+
+    dbname = ''
+    if benchmark in ['tpch', 'tpchc']:
+        dbname = 'indexselection_tpch___1'
+    elif benchmark in ['tpcds', 'tpcdsc']:
+        dbname = 'indexselection_tpcds___10'
+    elif benchmark in ['ceb', 'job']:
+        dbname = 'indexselection_job___1'
+    else:
+        raise ValueError(f"{dbname} not supported")
 
     hash2tid = {}
     tpl2tid = {}
@@ -113,7 +127,10 @@ def main():
         wk_size = args.wk_size
         if 'pkl' in ws_file:
             with open(ws_file, 'rb') as f:
-                flat_workload_stream_dicts = pickle.load(f)
+                d = pickle.load(f)
+            flat_workload_stream_dicts = d['flat_workload_stream_dicts']
+            tpl2tid = d['tpl2tid']
+            hash2tid = d['hash2tid']
         elif 'txt' in ws_file or 'sql' in ws_file:
             with open(ws_file, 'r') as f:
                 sqls = f.readlines()
@@ -121,32 +138,32 @@ def main():
                 sqls.pop()
             num_wks = len(sqls) // wk_size
             flat_workload_stream_dicts = [{k: 1 for k in sqls[i*wk_size:(i+1)*wk_size]} for i in range(num_wks)]
+
+            i = 1
+            tpl_stream = []
+            for w in flat_workload_stream_dicts:
+                for qstr  in w:
+                    q_tpl_hash, tpl = query_to_hash(qstr, unify_similar_ops=args.uniComp, dbname=dbname)
+                    tpl_stream.append(tpl)
+                    if q_tpl_hash not in hash2tid:
+                        tpl2tid[tpl] = i
+                        hash2tid[q_tpl_hash] = i
+                        i += 1
+
+
+            pkl_fn = ws_file.replace('.txt', '_balance.pkl')
+            d = {
+                        "flat_workload_stream_dicts":  flat_workload_stream_dicts, 
+                        "tpl2tid": tpl2tid,
+                        "hash2tid": hash2tid
+                    }
+            with open(pkl_fn, 'wb') as f:
+                pickle.dump(d, f)
         else:
             raise ValueError(f"{ws_file} can not be processed")
 
-    i = 1
-    tpl_stream = []
-
-    dbname = ''
-    if benchmark in ['tpch', 'tpchc']:
-        dbname = 'indexselection_tpch___1'
-    elif benchmark in ['tpcds', 'tpcdsc']:
-        dbname = 'indexselection_tpcds___10'
-    elif benchmark in ['ceb', 'job']:
-        dbname = 'indexselection_job___1'
-    else:
-        raise ValueError(f"{dbname} not supported")
 
     # __import__('ipdb').set_trace()
-    for w in flat_workload_stream_dicts:
-        for qstr  in w:
-            q_tpl_hash, tpl = query_to_hash(qstr, unify_similar_ops=args.uniComp, dbname=dbname)
-            tpl_stream.append(tpl)
-            if q_tpl_hash not in hash2tid:
-                tpl2tid[tpl] = i
-                hash2tid[q_tpl_hash] = i
-                i += 1
-
     # with open(f'{args.mode}.tmp', 'wb') as f:
     #     pickle.dump(flat_workload_stream_dicts, f)
     # os._exit(0)
@@ -178,6 +195,8 @@ def main():
     weight_path_list = [os.path.join(args.weight_list_path, f"weights{i}.pkl") for i in range(1, args.wk_size + 1)]
 
     w_ptr = 0
+    exp_folder = ''
+    chunk_config_path = ''
     for wdict in flat_workload_stream_dicts:
         w = convert_dict_to_workload(wdict, workload_generator=parsing_workload_generator, unify_similar_ops=args.uniComp)
         ws_debug.append(w)
@@ -189,21 +208,29 @@ def main():
                 logging.info(f"Enabling policy transfer for Chunk {chunk_ptr} from {len(source_model_pool)} source(s).")
                 config['source_model_paths'] = source_model_pool
                 config['rl_algorithm']['algorithm'] = 'ppo2_BALANCE'
+            else:
+                chunk_config_path = base_config_path
+                uni_freq_flag = True
 
-            chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
+            exp_folder = run_single_experiment(chunk_config_path, test_only=args.test_only, ts=config['timesteps'],
+                        uni_freq=uni_freq_flag, fix_index_count=config['fix_index_count'], newf=args.newf,
+                        input_workload=w, random_seed=args.random_seed,
+                        weight_path=weight_path_list[w_ptr], shuffle=args.shuffle,
+                        tb_log_path=args.tb_log)
+
+            chunk_config_path = f"{exp_folder}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
             with open(chunk_config_path, 'w') as f:
                 json.dump(config, f, indent=4)
 
-            res_path = run_single_experiment(chunk_config_path, test_only=False, ts=config['timesteps'],
-                        uni_freq=uni_freq_flag, fix_index_count=config['fix_index_count'], newf=args.newf,
-                        input_workload=w, random_seed=args.random_seed,
-                        weight_path=weight_path_list[w_ptr], shuffle=args.shuffle)
             logging.info("trained a model")
 
             # b. Update the source model path for the next iteration
-            exp_folder = f"experiment_results/ID_{config['id']}_{config['workload']['benchmark']}_ts{config['timesteps']}_{freq_label}"
-            if config['fix_index_count'] > 0:
-                exp_folder += f"_idxmax{config['fix_index_count']}"
+            # exp_folder = setup_exp_folder(config['result_path'], config['id'], config['workload']['benchmark'], config['timesteps'],
+            #                             dmxsz=config['workload_embedder']['representation_size'],fix_index_count= config['fix_index_count'], config=config)
+            # exp_folder = f"experiment_results/ID_{config['id']}_{config['workload']['benchmark']}_ts{config['timesteps']}_{freq_label}"
+            # if config['fix_index_count'] > 0:
+            #     exp_folder += f"_idxmax{config['fix_index_count']}"
+
             new_model_path = os.path.join(exp_folder, "final_model.zip")
             # assert res_path == exp_folder
             if os.path.exists(new_model_path):
@@ -215,13 +242,12 @@ def main():
             chunk_ptr = len(chunks) -1
         else:  # just append and test over the current workload
             chunks[-1].append(w)
-            chunk_config_path = f"experiment_results/{args.mode}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
-            res_path = run_single_experiment(chunk_config_path, test_only=True, ts=config['timesteps'],
+            chunk_config_path = f"{exp_folder}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
+            exp_folder = run_single_experiment(chunk_config_path, test_only=True, ts=config['timesteps'],
                         uni_freq=uni_freq_flag, fix_index_count=config['fix_index_count'], newf=args.newf,
                         input_workload=w, weight_path=weight_path_list[w_ptr], shuffle=args.shuffle,
-                        cli_disable_precedent_masking=args.cli_disable_precedent_masking,
-                        cli_enable_precedent_masking=args.cli_enable_precedent_masking,
-                        disable_precedent_masking=args.disable_precedent_masking
+                        cli_disable_precedent_masking=args.disable_precedent_masking,
+                        cli_enable_precedent_masking=args.enable_precedent_masking,
                         )
             print(f"test the model for new workload fits in the chunk {chunk_ptr}")
         w_ptr += 1

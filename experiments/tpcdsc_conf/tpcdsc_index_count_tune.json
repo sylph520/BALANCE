@@ -1,9 +1,9 @@
 {
   "id": "Test_Experiment_1_Index_Count",
-  "description": "TPCH Test Experiment with Index Count Constraint",
+  "description": "TPCDSC Test Experiment with Index Count Constraint",
   "gym_version": 1,
   "timesteps": 16000,
-  "database": "tpch_1_lhr",
+  "database": "indexselection_tpcds___10",
   "random_seed": 60,
   "parallel_environments": 1,
   "pickle_cost_estimation_caches": false,
@@ -17,7 +17,7 @@
   "reenable_indexes": false,
   "result_path": "experiment_results",
   "constraint_type": "count",
-  "constraint_value": 3,
+  "constraint_value": 5,
   "workload_embedder": {
     "type": "PlanEmbedderLSIBOW",
     "representation_size": 50
@@ -36,14 +36,18 @@
       ]
     },
     "args": {
-      "n_steps": 64
+		"learning_rate": 0.00005,
+		"n_steps": 512,
+		"nminibatches": 4,
+		"cliprange": 0.3,
+		"noptepochs": 30
     }
   },
   "workload": {
-    "benchmark": "TPCH",
-    "path": "./experiment_results/workloads/gen_tpch/train_workloads1.pickle",
+    "benchmark": "TPCDSC",
+    "path": "./experiment_results/workloads/gen_tpcdsc/train_workloads1.pickle",
     "scale_factor": 1,
-    "size": 14,
+    "size": 20,
     "varying_frequencies": true,
     "training_instances": 10000,
     "validation_testing": {
@@ -51,7 +55,7 @@
       "unknown_query_probabilities": [0.0]
     },
     "similar_workloads": false,
-    "excluded_query_classes": [2,17,20],
+    "excluded_query_classes": [],
     "unknown_queries": 0
   },
   "comparison_algorithms": ["extend", "db2advis"],
@@ -60,6 +64,5 @@
     "validation_and_testing": [3, 5, 7, 10, 12, 15]
   },
   "column_filters": {
-    "TableNumRowsFilter": 10000
   }
 }

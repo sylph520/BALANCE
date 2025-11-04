@@ -1,9 +1,9 @@
 {
-  "id": "CEB_Index_Count_Test",
-  "description": "CEB Test Experiment with Index Count Constraint",
+  "id": "Test_Experiment_1_Index_Count",
+  "description": "TPCDSC Test Experiment with Index Count Constraint",
   "gym_version": 1,
   "timesteps": 16000,
-  "database": "indexselection_job___1",
+  "database": "indexselection_tpcds___10",
   "random_seed": 60,
   "parallel_environments": 1,
   "pickle_cost_estimation_caches": false,
@@ -17,7 +17,7 @@
   "reenable_indexes": false,
   "result_path": "experiment_results",
   "constraint_type": "count",
-  "constraint_value": 3,
+  "constraint_value": 5,
   "workload_embedder": {
     "type": "PlanEmbedderLSIBOW",
     "representation_size": 50
@@ -36,8 +36,11 @@
       ]
     },
     "args": {
-      "n_steps": 256,
-	  "learning_rate": 0.00005
+		"learning_rate": 0.00005,
+		"n_steps": 512,
+		"nminibatches": 4,
+		"cliprange": 0.3,
+		"noptepochs": 30
     }
   },
   "workload": {
