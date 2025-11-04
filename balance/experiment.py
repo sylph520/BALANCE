@@ -43,14 +43,14 @@ class Experiment(object):
         """
         setup the experiment from configuration, random seed, and related method info
         """
-        self.rnd = random.Random()
-        self.rnd.seed(self.config["random_seed"])
-
         self._init_times()
         self.skip_folder_creation = skip_folder_creation
 
         cp = ConfigurationParser(configuration_file)
         self.config = cp.config
+
+        self.rnd = random.Random()
+        self.rnd.seed(self.config["random_seed"])
 
         self.config['random_seed'] = random_seed
         self.config['debug_print'] = debug_print
@@ -60,6 +60,8 @@ class Experiment(object):
         if gamma > 0:
             self.config["rl_algorithm"]["gamma"] = gamma
             self.gamma = gamma
+        else:
+            self.gamma = self.config['rl_algorithm'].get('gamma', 0.99)
         if lr > 0:
             self.config["rl_algorithm"]["args"]["learning_rate"] = lr
         if ec > 0:
@@ -72,8 +74,10 @@ class Experiment(object):
             self.config['workload_embedder']['representation_size'] = dmx_sz
         if uni_freq:
             self.config['workload']['varying_frequencies'] = not uni_freq
+
+        self.config['use_new_box_line_format'] = self.config.get('use_new_box_line_format', False)
         if newf:
-            self.config['use_new_box_line_format'] = newf 
+            self.config['use_new_box_line_format'] = newf
 
         self.id = self.config["id"]
 
@@ -986,8 +990,8 @@ class Experiment(object):
                     "env_id": env_id,
                     "similar_workloads": self.config["workload"]["similar_workloads"],
                     "ids": self.config["id"],
-                    "constraint_type": constraint_type,
-                    "constraint_value": constraint_value,
+                    "constraint_type": self.config['constraint_type'],
+                    "constraint_value": self.config['constraint_value'],
                     "reward_scale": reward_scale,
                 },
             )
