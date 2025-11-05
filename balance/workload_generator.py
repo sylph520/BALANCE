@@ -21,7 +21,7 @@ from .workload_embedder import WorkloadEmbedder
 
 QUERY_PATH = "query_files"
 
-def get_query_texts_from_file(file: str):
+def get_query_texts_from_file(file: str) -> List[str]:
     with open(file, 'r') as f:
         sqls = f.readlines()
     if sqls[-1] == '':
@@ -73,8 +73,9 @@ class WorkloadGenerator(object):
 
         # self.query_texts is list of lists. Outer list for query classes, inner list for instances of this class.
         #self.query_texts = self._retrieve_query_texts()
+        self.query_texts: List[List[str]] = []
         if not input_workload and not input_worklod_path:
-            self.query_texts = self._retrieve_query_texts_random_value()
+            self.query_texts = self._retrieve_query_texts_random_value()  # get queries texts from folders, e.g., TPCDSC/TPCDSC_*.txt
         elif input_worklod_path:
             self.query_texts = [[qstr] for qstr in get_query_texts_from_file(input_worklod_path)]
         else:
@@ -88,7 +89,8 @@ class WorkloadGenerator(object):
         self.wl_testing = []
 
         # __import__('pdb').set_trace()
-        if wk_config["similar_workloads"] and wk_config["unknown_queries"] == 0:  # similar workloads with all known queries
+        if False:
+        # if wk_config["similar_workloads"] and wk_config["unknown_queries"] == 0:  # similar workloads with all known queries
             # Todo: this branch can probably be removed
             assert self.varying_frequencies, "Similar workloads can only be created with varying frequencies."
             self.wl_validation = [None]
@@ -102,7 +104,8 @@ class WorkloadGenerator(object):
                 self.wl_training = self._generate_similar_workloads_qccf(
                     wk_config["training_instances"], wk_config["size"], wk_config["query_class_change_frequency"]
                 )
-        elif wk_config["unknown_queries"] > 0 and wk_config["validation_testing"]["unknown_query_probabilities"][-1] > 0.01:
+        elif False:
+        # elif wk_config["unknown_queries"] > 0 and wk_config["validation_testing"]["unknown_query_probabilities"][-1] > 0.01:
             # with unknown queries
             embedder_connector = PostgresDatabaseConnector(self.database_name, autocommit=True)
             embedder = WorkloadEmbedder(
@@ -170,7 +173,8 @@ class WorkloadGenerator(object):
                 self.wl_training, _, _ = self._generate_workloads(wk_config["training_instances"], 0, 0, wk_config["size"], weight_path=weight_path, shuffle=shuffle)
             # We are removing the restriction now.
             self.available_query_classes = original_available_query_classes
-        elif wk_config["unknown_queries"] > 0 and wk_config["validation_testing"]["unknown_query_probabilities"][-1] <= 0.01:
+        elif False:
+        # elif wk_config["unknown_queries"] > 0 and wk_config["validation_testing"]["unknown_query_probabilities"][-1] <= 0.01:
             # assert (
             #     config["validation_testing"]["unknown_query_probabilities"][-1] > 0
             # ), "Query unknown_query_probabilities should be larger 0."
@@ -238,10 +242,12 @@ class WorkloadGenerator(object):
                 self.wl_training, _, _ = self._generate_workloads(wk_config["training_instances"], 0, 0, wk_config["size"], weight_path=weight_path, shuffle=shuffle)
             # We are removing the restriction now.
             self.available_query_classes = original_available_query_classes
-        else:
+        # else:
+
+        if True:
             self.wl_validation = [None]
             self.wl_testing = [None]
-            if not input_workload and not input_worklod_path:
+            if not input_workload and not input_worklod_path:  # generated workloads with random orders with _generate_random_workload()
                 self.wl_training, self.wl_validation[0], self.wl_testing[0] = self._generate_workloads(
                             wk_config["training_instances"], validation_instances, test_instances, wk_config["size"],
                             weight_path=weight_path, shuffle=shuffle
@@ -249,14 +255,16 @@ class WorkloadGenerator(object):
             else:
                 workload_class_order, workload_class_freq = self._generate_random_workload(wk_config["size"], weight_path=weight_path, shuffle=shuffle)
                 if input_workload:
-                    input_workload.queries =  [input_workload.queries[workload_class_order[i]-1] for i in  range(wk_config['size'])]
-                else:
+                    pass
+                else:  # input_worklod_path
+                    assert input_worklod_path
                     queries = []
                     for i in range(wk_config['size']):
                         q = Query(query_id=i+1,query_text= self.query_texts[i][0], frequency=workload_class_freq[i])
                         self._store_indexable_columns(q)
                         queries.append(q)
                     input_workload = Workload(queries)
+                input_workload.queries =  [input_workload.queries[workload_class_order[i]-1] for i in  range(wk_config['size'])]
 
                 self.wl_training = [input_workload]
                 self.wl_validation = [[input_workload]]
@@ -407,8 +415,6 @@ class WorkloadGenerator(object):
     ):
         required_unique_workloads = train_instances + validation_instances + test_instances
 
-
-
         unique_workload_tuples = set()
         # sample *required_unique_workloads* number of workloads
         while required_unique_workloads > len(unique_workload_tuples):
@@ -557,7 +563,8 @@ class WorkloadGenerator(object):
             else:
                 with open(weight_path, 'rb') as f:
                     weight_list = pickle.load(f)
-                query_class_frequencies = tuple(weight_list)
+                weight_list2 = [weight_list[i-1] for i in workload_query_classes]
+                query_class_frequencies = tuple(weight_list2)
         else:
             query_class_frequencies = tuple([1 for frequency in range(size)])
 

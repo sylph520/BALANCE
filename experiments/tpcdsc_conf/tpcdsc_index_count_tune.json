@@ -51,7 +51,7 @@
     "varying_frequencies": true,
     "training_instances": 10000,
     "validation_testing": {
-      "number_of_workloads": 10,
+      "number_of_workloads": 1,
       "unknown_query_probabilities": [0.0]
     },
     "similar_workloads": false,

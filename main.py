@@ -167,7 +167,7 @@ def _resolve_tb_run_dir(log_path, log_name, new_tb_log):
 def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, weight_path='',
                           fix_index_count=0, dmx_sz=0,
                           test_workload_from_file='', test_workload_qids='', newf=False,
-                          input_workload: Workload=None,
+                          input_workload: Workload=None,  input_workload_path = '',
                           random_seed=0, shuffle=False, debug_print=False,
                           cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
                           tb_log_path='',
@@ -183,11 +183,6 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         tb_log_path = tb_log_path
     np.random.seed(random_seed)
     random.seed(random_seed)
-
-    if weight_path:
-        uni_freq = False
-    else:
-        uni_freq = True
 
     logging.warning("use gpu:" + use_gpu)
     if test_only:
@@ -316,7 +311,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         experiment = Experiment(CONFIGURATION_FILE, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts, dmx_sz=dmx_sz,
                     random_seed=random_seed, debug_print=debug_print, cli_disable_precedent_masking=cli_disable_precedent_masking,
                     cli_enable_precedent_masking=cli_enable_precedent_masking,
-                    skip_folder_creation=True,
+                    skip_folder_creation=False,
                     lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma, num_parallel_env=num_parallel_env)
 
         if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
@@ -333,7 +328,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         else:
             raise ValueError
 
-        experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle)
+        experiment.prepare(input_workload, input_workload_path, weight_path=weight_path, shuffle=shuffle)
         with open(f"{experiment.experiment_folder_path}/experiment_object.pickle", "wb") as handle:
             pickle.dump(experiment, handle, protocol=pickle.HIGHEST_PROTOCOL)
         ParallelEnv = SubprocVecEnv if experiment.config["parallel_environments"] > 1 else DummyVecEnv
@@ -467,31 +462,17 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         )
         if tb_run_dir:
             os.makedirs(tb_run_dir, exist_ok=True)
-            model_artifacts = [
-                fname
-                for fname in os.listdir(experiment.experiment_folder_path)
-                if fname.endswith(".zip")
-            ]
-            for artifact in model_artifacts:
-                src = os.path.join(experiment.experiment_folder_path, artifact)
-                dst = os.path.join(tb_run_dir, artifact)
-                try:
-                    shutil.copy2(src, dst)
-                except Exception as exc:
-                    logging.warning("Failed to copy model artifact %s to TensorBoard dir %s: %s", artifact, tb_run_dir, exc)
-            vec_normalize_path = os.path.join(experiment.experiment_folder_path, "vec_normalize.pkl")
-            if os.path.exists(vec_normalize_path):
-                try:
-                    shutil.copy2(vec_normalize_path, os.path.join(tb_run_dir, "vec_normalize.pkl"))
-                except Exception as exc:
-                    logging.warning("Failed to copy vec_normalize.pkl to TensorBoard dir %s: %s", tb_run_dir, exc)
-            if dump_initial_config:
-                initial_src = os.path.join(experiment.experiment_folder_path, "config.initial.json")
-                if os.path.exists(initial_src):
+            for root, _, files in os.walk(experiment.experiment_folder_path):
+                rel_path = os.path.relpath(root, experiment.experiment_folder_path)
+                dest_root = tb_run_dir if rel_path == "." else os.path.join(tb_run_dir, rel_path)
+                os.makedirs(dest_root, exist_ok=True)
+                for name in files:
+                    src_file = os.path.join(root, name)
+                    dst_file = os.path.join(dest_root, name)
                     try:
-                        shutil.copy2(initial_src, os.path.join(tb_run_dir, "config.initial.json"))
+                        shutil.copy2(src_file, dst_file)
                     except Exception as exc:
-                        logging.warning("Failed to copy initial config to TensorBoard dir %s: %s", tb_run_dir, exc)
+                        logging.warning("Failed to archive %s to TensorBoard dir %s: %s", src_file, dest_root, exc)
             experiment.dump_config_snapshot(tb_run_dir)
 
         with open(f"{experiment.experiment_folder_path}/workload_dic.pickle", "wb") as handle:
@@ -517,6 +498,8 @@ if __name__ == "__main__":
     parser.add_argument('--fix_index_count', type=int, default=0)
     parser.add_argument('--test_workload_file', type=str, help='Path to a .sql file to use as a custom test workload.')
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
+    parser.add_argument('--input_workload', default=None)
+    parser.add_argument('--input_workload_path', type=str, default='')
     parser.add_argument('--newf', action='store_true', default=False)
     parser.add_argument('--random_seed', type=int, default=0)
     parser.add_argument('--debug_print', action='store_true', help='Enable debug print statements')
@@ -545,15 +528,18 @@ if __name__ == "__main__":
         uni_freq_flag=args.uni_freq
 
     run_single_experiment(config_file, test_only=args.test_only, uni_freq=uni_freq_flag, weight_path=args.weight_path,\
-                            fix_index_count=args.fix_index_count, ts=args.ts,
-                            test_workload_from_file=args.test_workload_file, test_workload_qids = args.test_workload_qids,
-                            dmx_sz = args.dmx_sz,
-                            newf=args.newf, shuffle=args.shuffle, debug_print=args.debug_print,
-                            cli_disable_precedent_masking=args.disable_precedent_masking,
-                            cli_enable_precedent_masking=args.enable_precedent_masking,
-                            tb_log_path = args.tb_log,
-                            lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma,
-                            dump_initial_config=not args.skip_initial_config_dump,
-                            num_parallel_env=args.num_parallel_env,
-                            reward_scale=args.reward_scale,
-                            model_path=args.load_model)
+                          fix_index_count=args.fix_index_count, ts=args.ts,
+                          test_workload_from_file=args.test_workload_file,
+                          test_workload_qids = args.test_workload_qids,
+                          input_workload=args.input_workload,
+                          input_workload_path=args.input_workload_path,
+                          dmx_sz = args.dmx_sz,
+                          newf=args.newf, shuffle=args.shuffle, debug_print=args.debug_print,
+                          cli_disable_precedent_masking=args.disable_precedent_masking,
+                          cli_enable_precedent_masking=args.enable_precedent_masking,
+                          tb_log_path = args.tb_log,
+                          lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma,
+                          dump_initial_config=not args.skip_initial_config_dump,
+                          num_parallel_env=args.num_parallel_env,
+                          reward_scale=args.reward_scale,
+                          model_path=args.load_model)

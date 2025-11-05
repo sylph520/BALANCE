@@ -8,6 +8,7 @@ import pickle
 import random
 import subprocess
 import re
+import shutil
 
 import gym
 import numpy as np
@@ -171,6 +172,44 @@ class Experiment(object):
             logging.error(f"Could not create a workload from {filepath}. No valid queries found.")
             return Workload([], description=f"Empty workload from {filepath}")
 
+        meta_path = os.path.splitext(filepath)[0] + ".pkl"
+        if not os.path.exists(meta_path):
+            alt_meta = filepath + ".pkl"
+            if os.path.exists(alt_meta):
+                meta_path = alt_meta
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path, "rb") as handle:
+                    metadata = pickle.load(handle)
+            except Exception as exc:
+                logging.warning("Failed to load workload metadata from %s: %s", meta_path, exc)
+                metadata = None
+            if isinstance(metadata, list):
+                if selection_qids:
+                    selected_meta = []
+                    for qid in selection_qids:
+                        idx = qid - 1
+                        if 0 <= idx < len(metadata):
+                            selected_meta.append(metadata[idx])
+                        else:
+                            logging.warning("Metadata missing for query id %s in %s", qid, meta_path)
+                    meta_iter = zip(final_queries, selected_meta)
+                else:
+                    if len(metadata) != len(final_queries):
+                        logging.warning(
+                            "Metadata length mismatch for %s (meta=%d, queries=%d)",
+                            filepath, len(metadata), len(final_queries)
+                        )
+                    meta_iter = zip(final_queries, metadata)
+                for query, meta in meta_iter:
+                    if isinstance(meta, dict):
+                        if meta.get("query_id") is not None:
+                            query.nr = meta["query_id"]
+                        if meta.get("frequency") is not None:
+                            query.frequency = meta["frequency"]
+            else:
+                logging.warning("Unexpected metadata format in %s: %s", meta_path, type(metadata))
+
         return Workload(final_queries, description=f"Custom workload from {os.path.basename(filepath)}")
 
 
@@ -186,21 +225,22 @@ class Experiment(object):
             self.config["column_filters"]
         )  # setup schema and reduce columns with small rows
 
-        if self.config.get("load_workloads_from_file"):  # pickle file
-            with open(self.config["load_workloads_from_file"], "rb") as f:
-                chunk_workloads = pickle.load(f)
-
-            query_texts = [[q.text] for q in chunk_workloads[0].queries]
-            self.workload_generator = DummyWorkloadGenerator(
-                training=chunk_workloads[:20],
-                validation=[chunk_workloads[20:40]],
-                testing=[chunk_workloads[20:40]],
-                query_texts=query_texts,
-                columns=self.schema.columns,
-                number_of_query_classes=len(query_texts)
-            )
-            logging.info(f"Loaded workloads from {self.config['load_workloads_from_file']}")
-        else:
+        # if self.config.get("load_workloads_from_file"):  # pickle file
+        #     with open(self.config["load_workloads_from_file"], "rb") as f:
+        #         chunk_workloads = pickle.load(f)
+        #
+        #     query_texts = [[q.text] for q in chunk_workloads[0].queries]
+        #     self.workload_generator = DummyWorkloadGenerator(
+        #         training=chunk_workloads[:20],
+        #         validation=[chunk_workloads[20:40]],
+        #         testing=[chunk_workloads[20:40]],
+        #         query_texts=query_texts,
+        #         columns=self.schema.columns,
+        #         number_of_query_classes=len(query_texts)
+        #     )
+        #     logging.info(f"Loaded workloads from {self.config['load_workloads_from_file']}")
+        # else:
+        if True:
             self.workload_generator = WorkloadGenerator(
                 self.config["workload"], spath=self.config["workload"]["path"],
                 workload_columns=self.schema.columns,
@@ -296,6 +336,10 @@ class Experiment(object):
         with open(f"{self.experiment_folder_path}/train_workloads{st}.pickle", "wb") as handle:
             pickle.dump(self.workload_generator.wl_training, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+        self._dump_workloads_to_sql(self.workload_generator.wl_testing, "testing")
+        self._dump_workloads_to_sql(self.workload_generator.wl_validation, "validation")
+        self._dump_workloads_to_sql(self.workload_generator.wl_training, "training")
+
     def dump_config_snapshot(self, target_dir, filename="config.final.json"):
         """
         Persist the resolved experiment configuration to the given directory.
@@ -338,6 +382,51 @@ class Experiment(object):
         if isinstance(value, set):
             return [Experiment._json_safe(item) for item in sorted(value, key=lambda x: str(x))]
         return str(value)
+
+    def _dump_workloads_to_sql(self, workload_groups, prefix):
+        """
+        Persist workloads as .sql files so they can be re-imported via CLI.
+        """
+        if not workload_groups:
+            return
+
+        base_dir = os.path.join(self.experiment_folder_path, "sql_workloads", prefix)
+        if os.path.exists(base_dir):
+            shutil.rmtree(base_dir, ignore_errors=True)
+        os.makedirs(base_dir, exist_ok=True)
+
+        def _iter_workloads(obj):
+            if obj is None:
+                return
+            if hasattr(obj, "queries"):
+                yield obj
+            elif isinstance(obj, (list, tuple, set)):
+                for item in obj:
+                    yield from _iter_workloads(item)
+            else:
+                logging.debug("Skipping unsupported workload container type: %s", type(obj))
+
+        for workload_idx, workload in enumerate(_iter_workloads(workload_groups), start=1):
+            filename = os.path.join(base_dir, f"workload{workload_idx}.sql")
+            freq_dump = os.path.join(base_dir, f"workload{workload_idx}.pkl")
+            try:
+                frequencies = []
+                with open(filename, "w") as handle:
+                    for query in workload.queries:
+                        stmt = query.text.strip()
+                        if not stmt.endswith(";"):
+                            stmt += ";"
+                        handle.write(f"{stmt}\n")
+                        frequencies.append(
+                            {
+                                "query_id": getattr(query, "nr", None),
+                                "frequency": getattr(query, "frequency", 1),
+                            }
+                        )
+                with open(freq_dump, "wb") as handle:
+                    pickle.dump(frequencies, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            except Exception as exc:
+                logging.warning("Failed to write SQL dump %s: %s", filename, exc)
 
     def finishmy(self):
         self.end_time = datetime.datetime.now()
