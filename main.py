@@ -175,7 +175,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                           lr=-1, ec=-1, cr=-1, ns=-1, gamma=-1,
                           dump_initial_config=True, num_parallel_env=-1,
                           model_path='',
-                          reward_scale=1.0):
+                          reward_scale=1.0,
+                          test_model_freq=None):
     CONFIGURATION_FILE = configuration_file
     if tb_log_path  == 'None':
         tb_log_path = None
@@ -183,6 +184,17 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         tb_log_path = tb_log_path
     np.random.seed(random_seed)
     random.seed(random_seed)
+
+    def _apply_frequency_override(path, target_tag):
+        if not target_tag or target_tag not in ("uniFreq", "varyFreq"):
+            return path
+        if f"_{target_tag}" in path:
+            return path
+        if target_tag == "uniFreq" and "_varyFreq" in path:
+            return path.replace("_varyFreq", "_uniFreq", 1)
+        if target_tag == "varyFreq" and "_uniFreq" in path:
+            return path.replace("_uniFreq", "_varyFreq", 1)
+        return path
 
     logging.warning("use gpu:" + use_gpu)
     if test_only:
@@ -200,6 +212,23 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
 
         experiment_base_name = experiment.id
         folder_path = experiment.experiment_folder_path
+        original_folder_path = folder_path
+
+        folder_path_candidates = []
+        if test_model_freq:
+            override_path = _apply_frequency_override(folder_path, test_model_freq)
+            if override_path != folder_path:
+                folder_path_candidates.append(override_path)
+        folder_path_candidates.append(folder_path)
+
+        resolved_folder_path = next((p for p in folder_path_candidates if os.path.exists(p)), None)
+        if resolved_folder_path:
+            folder_path = resolved_folder_path
+            if folder_path != original_folder_path:
+                logging.info("Using experiment artifacts from %s (frequency override: %s).", folder_path, test_model_freq)
+                experiment.experiment_folder_path = folder_path
+        elif test_model_freq:
+            logging.warning("Frequency override '%s' did not match any existing folder.", test_model_freq)
 
         if os.path.exists(folder_path):
             tb_run_dir = None
@@ -217,6 +246,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             if tb_run_dir:
                 candidate_model_paths.append(os.path.join(tb_run_dir, "final_model.zip"))
             candidate_model_paths.append(os.path.join(folder_path, "final_model.zip"))
+            if original_folder_path and folder_path != original_folder_path:
+                candidate_model_paths.append(os.path.join(original_folder_path, "final_model.zip"))
 
             resolved_model_path = next((p for p in candidate_model_paths if p and os.path.exists(p)), None)
 
@@ -268,6 +299,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 if tb_run_dir:
                     vec_candidates.append(os.path.join(tb_run_dir, "vec_normalize.pkl"))
                 vec_candidates.append(os.path.join(folder_path, "vec_normalize.pkl"))
+                if original_folder_path and folder_path != original_folder_path:
+                    vec_candidates.append(os.path.join(original_folder_path, "vec_normalize.pkl"))
 
                 vec_norm_path = next((p for p in vec_candidates if os.path.exists(p)), None)
 
@@ -498,6 +531,7 @@ if __name__ == "__main__":
     parser.add_argument('--fix_index_count', type=int, default=0)
     parser.add_argument('--test_workload_file', type=str, help='Path to a .sql file to use as a custom test workload.')
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
+    parser.add_argument('--test_model_freq', choices=['uniFreq', 'varyFreq'], help='Override frequency tag when resolving saved model artifacts.')
     parser.add_argument('--input_workload', default=None)
     parser.add_argument('--input_workload_path', type=str, default='')
     parser.add_argument('--newf', action='store_true', default=False)
@@ -542,4 +576,5 @@ if __name__ == "__main__":
                           dump_initial_config=not args.skip_initial_config_dump,
                           num_parallel_env=args.num_parallel_env,
                           reward_scale=args.reward_scale,
-                          model_path=args.load_model)
+                          model_path=args.load_model,
+                          test_model_freq=args.test_model_freq)

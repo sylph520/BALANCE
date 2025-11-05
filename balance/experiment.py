@@ -1144,6 +1144,16 @@ def _build_rl_suffix(rl_cfg):
 
     return "-".join(suffix_tokens)
 
+
+def _candidate_frequency_variants(path):
+    variants = []
+    if "_varyFreq" in path:
+        variants.append(path.replace("_varyFreq", "_uniFreq", 1))
+    if "_uniFreq" in path:
+        variants.append(path.replace("_uniFreq", "_varyFreq", 1))
+    return variants
+
+
 def _format_value(value):
     if isinstance(value, float):
         return f"{value:.6g}"
