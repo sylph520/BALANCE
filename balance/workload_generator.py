@@ -428,8 +428,10 @@ class WorkloadGenerator(object):
             unique_workload_tuples.append(workload_tuple)
             unique_workload_set.add(workload_tuple)
             if not self.varying_frequencies and not shuffle:
-                validation_instances = max(1, validation_instances)
-                test_instances = max(1, test_instances)
+                # validation_instances = (1, validation_instances)
+                # test_instances = max(1, test_instances)
+                validation_instances = 1
+                test_instances = 1
                 break
 
         if not unique_workload_tuples:
