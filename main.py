@@ -528,7 +528,7 @@ if __name__ == "__main__":
     parser.add_argument('--ts', type=int, help='the number of time steps to train', default=0)
     parser.add_argument('--load_model', type=str, help='Path to saved model to test instead of training')
     parser.add_argument('--test_only', action='store_true', help='Load and test latest model from config experiment folder')
-    parser.add_argument('--uni_freq', action='store_true', default=True)
+    parser.add_argument('--uni_freq', action='store_true', default=False)
     # parser.add_argument('--weight_path', type=str, default='query_files/tpch12/weight1.pkl')
     # parser.add_argument('--weight_path', type=str, default='query_files/TPCHC/varied_weights.pkl')
     parser.add_argument('--weight_path', type=str, default='')

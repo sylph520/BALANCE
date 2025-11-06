@@ -415,30 +415,57 @@ class WorkloadGenerator(object):
     ):
         required_unique_workloads = train_instances + validation_instances + test_instances
 
-        unique_workload_tuples = set()
-        # sample *required_unique_workloads* number of workloads
-        while required_unique_workloads > len(unique_workload_tuples):
+        unique_workload_tuples = []
+        unique_workload_set = set()
+        attempts = 0
+        max_attempts = max(required_unique_workloads * 50, 100)
+        # sample *required_unique_workloads* unique workloads (or until attempts exhausted)
+        while len(unique_workload_tuples) < required_unique_workloads and attempts < max_attempts:
             workload_tuple = self._generate_random_workload(size, unknown_query_probability, weight_path, shuffle)
-            unique_workload_tuples.add(workload_tuple)
-            # if not self.varying_frequencies and not shuffle:
-            if True:
-                validation_instances = 1
-                test_instances = 1
+            attempts += 1
+            if workload_tuple in unique_workload_set:
+                continue
+            unique_workload_tuples.append(workload_tuple)
+            unique_workload_set.add(workload_tuple)
+            if not self.varying_frequencies and not shuffle:
+                validation_instances = max(1, validation_instances)
+                test_instances = max(1, test_instances)
                 break
 
-        validation_tuples = self.rnd.sample(unique_workload_tuples, validation_instances)
-        test_workload_tuples = self.rnd.sample(unique_workload_tuples, test_instances)
+        if not unique_workload_tuples:
+            workload_tuple = self._generate_random_workload(size, unknown_query_probability, weight_path, shuffle)
+            unique_workload_tuples.append(workload_tuple)
+            unique_workload_set.add(workload_tuple)
 
-        if self.varying_frequencies and shuffle:
-            unique_workload_tuples = unique_workload_tuples - set(validation_tuples)
-            unique_workload_tuples = unique_workload_tuples - set(test_workload_tuples)
-
-        train_workload_tuples = unique_workload_tuples
-
-        if self.varying_frequencies and shuffle:
-            assert (
-                len(train_workload_tuples) + len(test_workload_tuples) + len(validation_tuples) == required_unique_workloads
+        if not self.varying_frequencies and not shuffle:
+            validation_tuples = unique_workload_tuples[:1]
+            test_workload_tuples = unique_workload_tuples[:1]
+            train_workload_tuples = unique_workload_tuples
+        else:
+            validation_count = min(len(unique_workload_tuples), validation_instances)
+            validation_tuples = (
+                self.rnd.sample(unique_workload_tuples, validation_count) if validation_count > 0 else []
             )
+
+            remaining_after_validation = [tpl for tpl in unique_workload_tuples if tpl not in validation_tuples]
+            if not remaining_after_validation and validation_tuples:
+                # fall back to reusing validation tuples if we exhausted the pool
+                remaining_after_validation = validation_tuples[:]
+
+            test_count = min(len(remaining_after_validation), test_instances)
+            test_workload_tuples = (
+                self.rnd.sample(remaining_after_validation, test_count) if test_count > 0 else []
+            )
+
+            train_workload_tuples = [
+                tpl for tpl in unique_workload_tuples if tpl not in validation_tuples and tpl not in test_workload_tuples
+            ]
+
+            if self.varying_frequencies and shuffle:
+                assert (
+                    len(train_workload_tuples) + len(test_workload_tuples) + len(validation_tuples)
+                    == len(unique_workload_tuples)
+                )
 
 
 
