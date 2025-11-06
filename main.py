@@ -265,35 +265,37 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 model = experiment.model_type.load(resolved_model_path)
                 experiment.set_model(model)
 
-                if test_workload_from_file:
-                    logging.info(f"Using custom test workload from file: {test_workload_from_file}")
-                    query_ids = None
-                    if test_workload_qids:
-                        try:
-                            query_ids = [int(qid.strip()) for qid in test_workload_qids.split(',')]
-                        except ValueError:
-                            logging.error("Invalid format for --test_workload_qids. Please provide a comma-separated list of integers.")
-                            exit(1)
-                    test_wl = experiment.workload_from_sql_file(test_workload_from_file, selection_qids=query_ids)
-                    if fix_index_count > 0:
-                        test_wl.budget = fix_index_count
-                    test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
-                else:
-                    custom_wl = True
-                    if custom_wl:
-                        logging.info("Using custom hardcoded test workload.")
-                        if input_workload:
-                            test_wl = input_workload
-                        else:
-                            if not uni_freq:
-                                test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
-                            else:
-                                test_wl = experiment.workload_generator._workloads_from_tuples([tuple((input_qids, [1]*20))])[0]
-                        test_wl.budget = fix_index_count
-                        test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl], reward_scale=reward_scale)])
-                    else:
-                        logging.info("Using default test workload from configuration.")
-                        test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
+                # if test_workload_from_file:
+                #     logging.info(f"Using custom test workload from file: {test_workload_from_file}")
+                #     query_ids = None
+                #     if test_workload_qids:
+                #         try:
+                #             query_ids = [int(qid.strip()) for qid in test_workload_qids.split(',')]
+                #         except ValueError:
+                #             logging.error("Invalid format for --test_workload_qids. Please provide a comma-separated list of integers.")
+                #             exit(1)
+                #     test_wl = experiment.workload_from_sql_file(test_workload_from_file, selection_qids=query_ids)
+                #     if fix_index_count > 0:
+                #         test_wl.budget = fix_index_count
+                #     test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl])])
+                # else:
+                #     custom_wl = True
+                #     if custom_wl:
+                #         logging.info("Using custom hardcoded test workload.")
+                #         if input_workload:
+                #             test_wl = input_workload
+                #         else:
+                #             if not uni_freq:
+                #                 test_wl = experiment.workload_generator._workloads_from_tuples([tuple((list(range(1, 21)), [1]*20))])[0]
+                #             else:
+                #                 test_wl = experiment.workload_generator._workloads_from_tuples([tuple((input_qids, [1]*20))])[0]
+                #
+                #         test_wl.budget = fix_index_count
+                #         test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING, workloads_in=[test_wl], reward_scale=reward_scale)])
+                #     else:
+                #         logging.info("Using default test workload from configuration.")
+                #         test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
+                test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
 
                 vec_candidates = []
                 if tb_run_dir:
