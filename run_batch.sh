@@ -79,7 +79,6 @@ for workload_path in "${workloads[@]}"; do
   CMD=(python main.py
     --config "$CONFIG_PATH"
     --test_only
-    --fix_index_count 5
     --ts "$TS"
     --input_workload_path "$workload_path"
     --weight_path "$weight_path"

@@ -580,7 +580,7 @@ if __name__ == "__main__":
     else:
         config_file = f"experiments/{(args.wk_type).lower()}_conf/{(args.wk_type).lower()}.json"
 
-    if args.weight_path:
+    if args.weight_path and args.test_model_freq == 'varyFreq':
         uni_freq_flag = False
     else:
         uni_freq_flag=args.uni_freq

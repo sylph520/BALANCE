@@ -73,7 +73,7 @@ class Experiment(object):
             self.config["rl_algorithm"]["args"]["n_steps"] = ns
         if dmx_sz:
             self.config['workload_embedder']['representation_size'] = dmx_sz
-        if uni_freq:
+        if uni_freq is not None:
             self.config['workload']['varying_frequencies'] = not uni_freq
 
         self.config['use_new_box_line_format'] = self.config.get('use_new_box_line_format', False)
@@ -84,8 +84,7 @@ class Experiment(object):
 
         if num_parallel_env != -1:
             self.config["parallel_environments"] = num_parallel_env
-            logging.INFO(f"parallev env num overwriten from {self.config['parallel_environment']} to {num_parallel_env}")
-
+            logging.info(f"parallev env num overwriten from {self.config['parallel_environments']} to {num_parallel_env}")
         config_disable_precedent_masking = self.config.get('disable_precedent_masking', True)
         # Handle disable_precedent_masking with CLI precedence
         if cli_disable_precedent_masking is True:
