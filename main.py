@@ -253,6 +253,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
 
             if resolved_model_path:
                 logging.info(f"Loading model from: {resolved_model_path}")
+                resolved_model_dir = os.path.dirname(resolved_model_path)
                 if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
                     from stable_baselines.ppo2 import ppo2
                     algorithm_class = ppo2.PPO2
@@ -298,6 +299,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 test_env_dummy = DummyVecEnv([experiment.make_env(0, EnvironmentType.TESTING)])
 
                 vec_candidates = []
+                if resolved_model_dir:
+                    vec_candidates.append(os.path.join(resolved_model_dir, "vec_normalize.pkl"))
                 if tb_run_dir:
                     vec_candidates.append(os.path.join(tb_run_dir, "vec_normalize.pkl"))
                 vec_candidates.append(os.path.join(folder_path, "vec_normalize.pkl"))
