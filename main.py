@@ -21,6 +21,7 @@ use_gpu = os.environ['CUDA_VISIBLE_DEVICES']
 import math
 import datetime
 from stable_baselines.common.callbacks import BaseCallback
+from stable_baselines.common.running_mean_std import RunningMeanStd
 
 class PPODiagnosticsCallback(BaseCallback):
     """
@@ -176,7 +177,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                           dump_initial_config=True, num_parallel_env=-1,
                           model_path='',
                           reward_scale=1.0,
-                          test_model_freq=None):
+                          test_model_freq=None,
+                          reset_norm_on_vary_freq="auto"):
     CONFIGURATION_FILE = configuration_file
     if tb_log_path  == 'None':
         tb_log_path = None
@@ -379,6 +381,21 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
             norm_obs=True, norm_reward=True,
             clip_obs=10., clip_reward=10.
         )
+        should_reset_norm = False
+        if reset_norm_on_vary_freq == "on":
+            should_reset_norm = True
+        elif reset_norm_on_vary_freq == "auto":
+            should_reset_norm = experiment.config["workload"].get("varying_frequencies", False)
+        elif reset_norm_on_vary_freq == "off":
+            should_reset_norm = False
+        else:
+            logging.warning("Unknown reset_norm_on_vary_freq setting '%s'. Defaulting to auto.", reset_norm_on_vary_freq)
+            should_reset_norm = experiment.config["workload"].get("varying_frequencies", False)
+
+        if should_reset_norm:
+            logging.info("Resetting VecNormalize statistics due to varying-frequency training.")
+            training_env.obs_rms = RunningMeanStd(shape=training_env.obs_rms.mean.shape)
+            training_env.ret_rms = RunningMeanStd(shape=())
 
         temac = []
 
@@ -537,6 +554,8 @@ if __name__ == "__main__":
     parser.add_argument('--test_workload_file', type=str, help='Path to a .sql file to use as a custom test workload.')
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
     parser.add_argument('--test_model_freq', choices=['uniFreq', 'varyFreq'], help='Override frequency tag when resolving saved model artifacts.')
+    parser.add_argument('--reset_norm_on_vary_freq', choices=['auto', 'on', 'off'], default='auto',
+                        help='Control VecNormalize reset when training with varying frequencies (auto=reset only for varyFreq).')
     parser.add_argument('--input_workload', default=None)
     parser.add_argument('--input_workload_path', type=str, default='')
     parser.add_argument('--newf', action='store_true', default=False)
@@ -582,4 +601,5 @@ if __name__ == "__main__":
                           num_parallel_env=args.num_parallel_env,
                           reward_scale=args.reward_scale,
                           model_path=args.load_model,
-                          test_model_freq=args.test_model_freq)
+                          test_model_freq=args.test_model_freq,
+                          reset_norm_on_vary_freq=args.reset_norm_on_vary_freq)
