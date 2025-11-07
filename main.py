@@ -22,119 +22,8 @@ import math
 import datetime
 from stable_baselines.common.callbacks import BaseCallback
 from stable_baselines.common.running_mean_std import RunningMeanStd
+from balance.additional_cbs import *
 
-class PPODiagnosticsCallback(BaseCallback):
-    """
-    Logs and warns when PPO training shows unhealthy patterns:
-    - critic collapse (explained variance < 0)
-    - entropy too high/low (relative entropy out of [0.05, 0.2])
-    - frozen updates (KL < 0.001 or clipfrac < 0.05)
-    Adds text summaries to TensorBoard as well.
-    """
-
-    def __init__(self, action_space_size, verbose=1):
-        super(PPODiagnosticsCallback, self).__init__(verbose)
-        self.A = float(action_space_size)
-        self.warning_log = []
-        self.logger_ref = None  # Will be set during training
-
-    def _init_callback(self):
-        # Called once training starts — model.logger now exists
-        self.logger_ref = getattr(self.model, "logger", None)
-
-    def _record_warning(self, message):
-        """Add warning to rolling log + TensorBoard."""
-        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-        full_msg = f"[{timestamp}] {message}"
-        self.warning_log.append(full_msg)
-        self.warning_log = self.warning_log[-15:]  # keep last 15 warnings
-
-        # Print to console
-        if self.verbose > 0:
-            print(f"\033[93m⚠️ {full_msg}\033[0m")
-
-        # Log to TensorBoard if available
-        if self.logger_ref is not None:
-            tb_text = "\n".join(self.warning_log)
-            self.logger_ref.record("diagnostics/warnings_text", tb_text)
-
-    def _on_step(self) -> bool:
-        if self.logger_ref is None:
-            return True  # Skip until logger is ready
-
-        logs = getattr(self.logger_ref, "name_to_value", {}) or {}
-
-        ev = logs.get("train/explained_variance")
-        ent = logs.get("loss/entropy_loss")
-        kl = logs.get("loss/approximate_kullback-leibler")
-        clipfrac = logs.get("loss/clip_factor")
-
-        # ---- Critic health ----
-        if ev is not None and ev < 0:
-            self._record_warning(f"Critic collapse detected (EV={ev:.3f})")
-
-        # ---- Entropy checks ----
-        if ent is not None:
-            rel_ent = ent / math.log(self.A)
-            self.logger_ref.record("diagnostics/relative_entropy", rel_ent)
-            if rel_ent > 0.3:
-                self._record_warning(f"Entropy too high (rel={rel_ent:.2f}) — reduce ent_coef")
-            elif rel_ent < 0.03:
-                self._record_warning(f"Entropy too low (rel={rel_ent:.2f}) — exploration dying")
-
-        # ---- PPO update health ----
-        if kl is not None and kl < 0.001:
-            self._record_warning(f"PPO nearly frozen (KL={kl:.4f})")
-
-        if clipfrac is not None and clipfrac < 0.05:
-            self._record_warning(f"Updates too conservative (clipfrac={clipfrac:.3f})")
-
-        return True
-
-class VecNormDiagCallback(BaseCallback):
-    """
-    Print VecNormalize stats every few updates.
-    """
-    def __init__(self, check_freq=5000, verbose=0):
-        super(VecNormDiagCallback, self).__init__(verbose)
-        self.check_freq = check_freq
-
-    def _on_step(self):
-        # 'self.training_env' is VecNormalize(env, ...)
-        if self.num_timesteps % self.check_freq == 0:
-            try:
-                vec = self.training_env
-                print(f"\n[Diag] step={self.num_timesteps}")
-                print("Reward RMS mean:", vec.ret_rms.mean)
-                print("Reward RMS var :", vec.ret_rms.var)
-                print("Obs RMS mean:", vec.obs_rms.mean.mean())
-                print("Obs RMS var :", vec.obs_rms.var.mean())
-            except Exception as e:
-                print("[Diag] Could not read VecNormalize stats:", e)
-        return True
-
-class EntropySchedulerCallback(BaseCallback):
-    """
-    CORRECTED: A custom callback that linearly decays the entropy coefficient (ent_coef)
-    by directly accessing the model.ent_coef attribute, which is correct for PPO2 in SB2.
-    """
-    def __init__(self, start_value, end_value, total_timesteps, verbose=0):
-        super(EntropySchedulerCallback, self).__init__(verbose)
-        self.start_value = start_value
-        self.end_value = end_value
-        self.total_timesteps = total_timesteps
-
-    def _on_step(self) -> bool:
-        # Calculate the fraction of total training completed
-        progress = self.num_timesteps / self.total_timesteps
-        
-        # Linear decay formula
-        new_ent_coef = self.start_value - (self.start_value - self.end_value) * progress
-        
-        # **CORRECTED ACTION:** Set the new entropy coefficient by modifying the attribute directly
-        self.model.ent_coef = new_ent_coef
-
-        return True # Continue training
 
 def _get_latest_tb_run_id(log_path, log_name):
     if not log_path or not log_name:
@@ -165,6 +54,18 @@ def _resolve_tb_run_dir(log_path, log_name, new_tb_log):
     return os.path.join(log_path, f"{log_name}_{run_id}")
 
 
+def _apply_frequency_override(path, target_tag):
+    if not target_tag or target_tag not in ("uniFreq", "varyFreq"):
+        return path
+    if f"_{target_tag}" in path:
+        return path
+    if target_tag == "uniFreq" and "_varyFreq" in path:
+        return path.replace("_varyFreq", "_uniFreq", 1)
+    if target_tag == "varyFreq" and "_uniFreq" in path:
+        return path.replace("_uniFreq", "_varyFreq", 1)
+    return path
+
+
 def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=False, weight_path='',
                           fix_index_count=0, dmx_sz=0,
                           test_workload_from_file='', test_workload_qids='', newf=False,
@@ -173,12 +74,13 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                           cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
                           tb_log_path='',
                         #   lr=0.00025, ec=.01, cr=0.2, ns=128, gamma=0.99,
-                          lr=-1, ec=-1, cr=-1, ns=-1, gamma=-1,
+                          lr=-1, ec=-1, cr=-1, ns=-1, gamma=-1, noe=-1, nmb=-1,
                           dump_initial_config=True, num_parallel_env=-1,
                           model_path='',
                           reward_scale=1.0,
                           test_model_freq=None,
-                          reset_norm_on_vary_freq="auto"):
+                          reset_norm_on_vary_freq="auto",
+                          adaptive_schedule=0):
     CONFIGURATION_FILE = configuration_file
     if tb_log_path  == 'None':
         tb_log_path = None
@@ -187,23 +89,12 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
     np.random.seed(random_seed)
     random.seed(random_seed)
 
-    def _apply_frequency_override(path, target_tag):
-        if not target_tag or target_tag not in ("uniFreq", "varyFreq"):
-            return path
-        if f"_{target_tag}" in path:
-            return path
-        if target_tag == "uniFreq" and "_varyFreq" in path:
-            return path.replace("_varyFreq", "_uniFreq", 1)
-        if target_tag == "varyFreq" and "_uniFreq" in path:
-            return path.replace("_uniFreq", "_varyFreq", 1)
-        return path
-
     logging.warning("use gpu:" + use_gpu)
     if test_only:
         experiment = Experiment(CONFIGURATION_FILE, skip_folder_creation=True, uni_freq=uni_freq, fix_index_count=fix_index_count, ts=ts,
                 newf=newf, random_seed=random_seed, debug_print=debug_print, dmx_sz=dmx_sz,
                 cli_disable_precedent_masking=cli_disable_precedent_masking, cli_enable_precedent_masking=cli_enable_precedent_masking,
-                lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma)
+                lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma, noe=noe, nmb=nmb)
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
         experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle, input_workload_path=test_workload_from_file)
@@ -352,7 +243,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                     random_seed=random_seed, debug_print=debug_print, cli_disable_precedent_masking=cli_disable_precedent_masking,
                     cli_enable_precedent_masking=cli_enable_precedent_masking,
                     skip_folder_creation=False,
-                    lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma, num_parallel_env=num_parallel_env)
+                    lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma, noe=noe, nmb=nmb,
+                    num_parallel_env=num_parallel_env)
 
         if experiment.config["rl_algorithm"]["stable_baselines_version"] == 2:
             from stable_baselines.common.callbacks import EvalCallbackWithTBRunningAverage
@@ -474,12 +366,20 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
         vecnormCallback = VecNormDiagCallback(check_freq=5000)
 
         ent_callback = EntropySchedulerCallback(
-            start_value=0.001, 
-            end_value=0.00001, 
+            start_value=0.001,
+            end_value=0.00001,
             total_timesteps=experiment.config['timesteps'],
         )
+        adaptive_cb = AdaptivePhaseCallback(callback_test_env,
+                                    # check_freq=10_000,
+                                    # adaptation_steps=20_000
+                                    check_freq=1_000,
+                                    adaptation_steps=2_000
+                                    )
         # callbacks = [validation_callback, test_callback, diag_callback, ent_callback]
         callbacks = [validation_callback, test_callback, vecnormCallback]
+        if adaptive_schedule:
+            callbacks.append(adaptive_cb)
 
         if len(experiment.multi_validation_wl) > 0:
             callback_multi_validation_env = VecNormalize(
@@ -572,7 +472,10 @@ if __name__ == "__main__":
     parser.add_argument('--ec', type=float, default=-1)
     parser.add_argument('--cr', type=float, default=-1)
     parser.add_argument('--gamma', type=float, default=-1)
+    parser.add_argument('--noe', type=int, default=-1)
+    parser.add_argument('--nmb', type=int, default=-1)
     parser.add_argument('--reward_scale', type=float, default=1.0)
+    parser.add_argument('--adaptive_schedule', type=int, default=0)
     args = parser.parse_args()
 
     if args.config:
@@ -596,10 +499,11 @@ if __name__ == "__main__":
                           cli_disable_precedent_masking=args.disable_precedent_masking,
                           cli_enable_precedent_masking=args.enable_precedent_masking,
                           tb_log_path = args.tb_log,
-                          lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma,
+                          lr=args.lr, ec=args.ec, cr=args.cr, ns=args.ns, gamma=args.gamma, noe=args.noe, nmb=args.nmb,
                           dump_initial_config=not args.skip_initial_config_dump,
                           num_parallel_env=args.num_parallel_env,
                           reward_scale=args.reward_scale,
                           model_path=args.load_model,
                           test_model_freq=args.test_model_freq,
-                          reset_norm_on_vary_freq=args.reset_norm_on_vary_freq)
+                          reset_norm_on_vary_freq=args.reset_norm_on_vary_freq,
+                          adaptive_schedule=args.adaptive_schedule)

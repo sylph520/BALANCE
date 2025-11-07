@@ -261,6 +261,10 @@ class DBEnvV1(gym.Env):
     def get_cost_eval_cache(self):
         return self.cost_evaluation.cache
 
+    def get_query_frequencies(self):
+        freqs = [q.frequency for q in self.current_workload.queries]
+        return freqs
+
     # BEGIN OF NOT IMPLEMENTED ##########
     def render(self, mode="human"):
         print("render() was called")

@@ -40,7 +40,8 @@ class Experiment(object):
                 uni_freq=None, fix_index_count=0, dmx_sz=0,
                 ts=0, lsi_dimension=None, newf=None, random_seed=None, debug_print=False,
                 cli_disable_precedent_masking=None, cli_enable_precedent_masking=None,
-                lr=-1, ec=-1, cr=-1, ns=-1, gamma=-1, num_parallel_env=-1):
+                lr=-1, ec=-1, cr=-1, ns=-1, gamma=-1, noe=-1, nmb=-1,
+                num_parallel_env=-1):
         """
         setup the experiment from configuration, random seed, and related method info
         """
@@ -71,6 +72,10 @@ class Experiment(object):
             self.config["rl_algorithm"]["args"]["cliprange"] = cr
         if ns > 0:
             self.config["rl_algorithm"]["args"]["n_steps"] = ns
+        if noe > 0:
+            self.config["rl_algorithm"]["args"]["noptepochs"] = noe
+        if nmb > 0:
+            self.config["rl_algorithm"]["args"]["nminibatches"] = nmb
         if dmx_sz:
             self.config['workload_embedder']['representation_size'] = dmx_sz
         if uni_freq is not None:
