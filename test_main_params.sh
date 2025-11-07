@@ -180,7 +180,9 @@ require_value_list ts "--ts must be supplied (comma-separated values allowed)"
 
 declare -a combos=("")
 for key in "${key_order[@]}"; do
-  readarray -t values < <(printf '%s\n' "${value_lists[$key]}")
+  value_data="${value_lists[$key]-}"
+  [[ -z "$value_data" ]] && continue
+  readarray -t values < <(printf '%s\n' "$value_data")
   [[ ${#values[@]} -eq 0 ]] && continue
   new_combos=()
   for combo in "${combos[@]}"; do
