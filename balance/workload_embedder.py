@@ -93,6 +93,30 @@ class WorkloadEmbedder(object):
     def get_embeddings(self, workload):
         raise NotImplementedError
 
+    def _pad_or_truncate(self, values, target_size=None):
+        """
+        Ensure vectors match the configured representation size by trimming or padding with zeros.
+        """
+        target = target_size if target_size is not None else self.representation_size
+        if len(values) == target:
+            return values
+        if len(values) > target:
+            return values[:target]
+        return values + [0.0] * (target - len(values))
+
+    def _dense_topic_vector(self, lsi_projection, target_size=None):
+        """
+        Convert sparse LSI projections into fixed-length dense vectors.
+        """
+        target = target_size if target_size is not None else self.representation_size
+        dense = [0.0] * target
+        for topic, value in lsi_projection:
+            topic_idx = int(topic)
+            if topic_idx < 0 or topic_idx >= target:
+                continue
+            dense[topic_idx] = value
+        return dense
+
 
 class SQLWorkloadEmbedder(WorkloadEmbedder):
     def __init__(self, query_texts, representation_size, database_connector, columns):
@@ -152,9 +176,9 @@ class SQLWorkloadLSI(WorkloadEmbedder):
             tokens = [token for token in tokens if token not in self.STOPTOKENS]
             bow = self.dictionary.doc2bow(tokens)
             result = self.lsi_bow[bow]
-            result = [x[1] for x in result]
+            dense = self._dense_topic_vector(result)
 
-            embeddings.append(result)
+            embeddings.append(dense)
 
         return embeddings
 
@@ -259,7 +283,8 @@ class PlanEmbedder(WorkloadEmbedder):
         ind = 0
         res = []
         for emb in embeddings:
-            emb = (emb+val_pca[ind].tolist())
+            emb = emb + val_pca[ind].tolist()
+            emb = self._pad_or_truncate(emb, self.true_representation_size)
             ind = ind+1
             res.append(emb)
         return res
@@ -377,22 +402,20 @@ class PlanEmbedderLSIBOW(PlanEmbedder):
         self.lsi_bow.save('tpcds_lsi.model')
         self.lsi_bow = gensim.models.LsiModel.load('tpcds_lsi.model')
 
-        assert (
-            len(self.lsi_bow.get_topics()) == self.representation_size
-        ), f"Topic-representation_size mismatch: {len(self.lsi_bow.get_topics())} vs {self.representation_size}"
+        topic_count = len(self.lsi_bow.get_topics())
+        if topic_count != self.representation_size:
+            logging.warning(
+                "Topic-representation_size mismatch: %d vs %d. Shortfall will be zero-padded.",
+                topic_count,
+                self.representation_size,
+            )
 
     def _infer(self, bow, boo):
         result = self.lsi_bow[bow]
 
-        if len(result) == self.representation_size:
-            vector = [x[1] for x in result]
-        else:
-            vector = [0] * self.representation_size
-            for topic, value in result:
-                vector[topic] = value
-        assert len(vector) == self.representation_size
+        dense = self._dense_topic_vector(result)
 
-        return vector
+        return dense
 
 
 class PlanEmbedderLSIBOWWithoutIndexes(PlanEmbedderLSIBOW):
@@ -413,19 +436,17 @@ class PlanEmbedderLSITFIDF(PlanEmbedder):
             self.corpus_tfidf, id2word=self.dictionary, num_topics=self.representation_size
         )
 
-        assert (
-            len(self.lsi_tfidf.get_topics()) == self.representation_size
-        ), f"Topic-representation_size mismatch: {len(self.lsi_tfidf.get_topics())} vs {self.representation_size}"
+        topic_count = len(self.lsi_tfidf.get_topics())
+        if topic_count != self.representation_size:
+            logging.warning(
+                "TFIDF topic-representation_size mismatch: %d vs %d. Shortfall will be zero-padded.",
+                topic_count,
+                self.representation_size,
+            )
 
     def _infer(self, bow, boo):
         result = self.lsi_tfidf[self.tfidf[bow]]
 
-        if len(result) == self.representation_size:
-            vector = [x[1] for x in result]
-        else:
-            vector = [0] * self.representation_size
-            for topic, value in result:
-                vector[topic] = value
-        assert len(vector) == self.representation_size
+        dense = self._dense_topic_vector(result)
 
-        return vector
+        return dense
