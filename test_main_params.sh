@@ -109,7 +109,7 @@ wait_for_pid() {
   unset pid_logs["$pid"]
 }
 
-DEFAULT_CONFIG="experiments/ceb_conf/ceb_index_count_penv_dft.json"
+DEFAULT_CONFIG="experiments/ceb_conf/ceb_index_count_penv_sb2dft.json"
 LOG_DIR="./logs"
 RUN_MODE="sequential"
 DRY_RUN=false

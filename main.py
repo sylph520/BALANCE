@@ -80,7 +80,8 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                           reward_scale=1.0,
                           test_model_freq=None,
                           reset_norm_on_vary_freq="auto",
-                          adaptive_schedule=0):
+                          adaptive_schedule=0,
+                          test_unifreq=0):
     CONFIGURATION_FILE = configuration_file
     if tb_log_path  == 'None':
         tb_log_path = None
@@ -97,7 +98,7 @@ def run_single_experiment(configuration_file, test_only, ts=16000, uni_freq=Fals
                 lr=lr, ec=ec, cr=cr, ns=ns, gamma=gamma, noe=noe, nmb=nmb)
         from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 
-        experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle, input_workload_path=test_workload_from_file)
+        experiment.prepare(input_workload, weight_path=weight_path, shuffle=shuffle, input_workload_path=input_workload_path)
         if input_workload:
             input_qids = [q.nr  for q in input_workload.queries]
         else:
@@ -454,6 +455,7 @@ if __name__ == "__main__":
     parser.add_argument('--test_workload_file', type=str, help='Path to a .sql file to use as a custom test workload.')
     parser.add_argument('--test_workload_qids', type=str, help='Comma-separated list of query IDs for the custom test workload.')
     parser.add_argument('--test_model_freq', choices=['uniFreq', 'varyFreq'], help='Override frequency tag when resolving saved model artifacts.')
+    parser.add_argument('--test_unifreq', type=int, default=1)
     parser.add_argument('--reset_norm_on_vary_freq', choices=['auto', 'on', 'off'], default='auto',
                         help='Control VecNormalize reset when training with varying frequencies (auto=reset only for varyFreq).')
     parser.add_argument('--input_workload', default=None)
@@ -483,7 +485,7 @@ if __name__ == "__main__":
     else:
         config_file = f"experiments/{(args.wk_type).lower()}_conf/{(args.wk_type).lower()}.json"
 
-    if args.weight_path and args.test_model_freq == 'varyFreq':
+    if args.weight_path or not args.test_unifreq:
         uni_freq_flag = False
     else:
         uni_freq_flag=args.uni_freq
@@ -506,4 +508,5 @@ if __name__ == "__main__":
                           model_path=args.load_model,
                           test_model_freq=args.test_model_freq,
                           reset_norm_on_vary_freq=args.reset_norm_on_vary_freq,
-                          adaptive_schedule=args.adaptive_schedule)
+                          adaptive_schedule=args.adaptive_schedule,
+                          test_unifreq=args.test_unifreq)
