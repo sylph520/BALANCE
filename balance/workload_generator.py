@@ -259,9 +259,16 @@ class WorkloadGenerator(object):
                 else:  # input_worklod_path
                     assert input_worklod_path
                     queries = []
+                    qid2cols = {}
+                    qhash2cols_fn = 'ceb_tmp_col.pkl'
+                    if os.path.exists(qhash2cols_fn):
+                        with open(qhash2cols_fn, 'rb') as f:
+                            qid2cols = pickle.load(f)
                     for i in range(wk_config['size']):
                         q = Query(query_id=i+1,query_text= self.query_texts[i][0], frequency=workload_class_freq[i])
-                        self._store_indexable_columns(q)
+
+                        self._store_indexable_columns(q, qid2cols)
+                        
                         queries.append(q)
                     input_workload = Workload(queries)
                 input_workload.queries =  [input_workload.queries[workload_class_order[i]-1] for i in  range(wk_config['size'])]
@@ -352,30 +359,36 @@ class WorkloadGenerator(object):
 
         return processed_queries
 
-    def _store_indexable_columns(self, query):
+    def _store_indexable_columns(self, query, qid2cols={}):
         """
         referenced columns for non-JOB benchmark;
         for JOB, only accounts for the columns after keyword WHERE
         """
-        if self.benchmark != "JOB":
-            # TODO: select filtered db columns where their names in the query text,
-            # there're issues with this rule, but it's fine with 22 query class in tpc-h
-            # e.g., part and partsupp always co-occurs.
-            for column in self.workload_columns:
-                if column.name in query.text:
-                    query.columns.append(column)
+        qid = query.nr
+        if len(qid2cols)>0 and qid in qid2cols:
+            query.columns = qid2cols[qid]
         else:
-            query_text = query.text
-            assert "WHERE" in query_text, f"Query without WHERE clause encountered: {query_text} in {query.nr}"
+            if self.benchmark != "JOB":
+            # if self.benchmark not in ["JOB", "CEB"]:
+                # TODO: select filtered db columns where their names in the query text,
+                # there're issues with this rule, but it's fine with 22 query class in tpc-h
+                # e.g., part and partsupp always co-occurs.
+                for column in self.workload_columns:
+                    if column.name in query.text:
+                        query.columns.append(column)
+            else:
+                query_text = query.text
+                assert "WHERE" in query_text, f"Query without WHERE clause encountered: {query_text} in {query.nr}"
 
-            split = query_text.split("WHERE")
-            assert len(split) == 2, "Query split for JOB query contains subquery"
-            query_text_before_where = split[0]
-            query_text_after_where = split[1]
+                split = query_text.split("WHERE")
+                assert len(split) == 2, "Query split for JOB query contains subquery"
+                query_text_before_where = split[0]
+                query_text_after_where = split[1]
 
-            for column in self.workload_columns:
-                if column.name in query_text_after_where and f"{column.table.name} " in query_text_before_where:
-                    query.columns.append(column)
+                for column in self.workload_columns:
+                    if column.name in query_text_after_where and f"{column.table.name} " in query_text_before_where:
+                        query.columns.append(column)
+            qid2cols[qid] = query.columns
 
     def _workloads_from_tuples(self, tuples, unknown_query_probability=None) -> List[Workload]:
         """
@@ -383,6 +396,13 @@ class WorkloadGenerator(object):
         """
         workloads = []
         unknown_query_probability = "" if unknown_query_probability is None else unknown_query_probability
+
+        qid2cols = {}
+        qid2cols_fn = 'ceb_tmp_col.pkl'
+        if os.path.exists(qid2cols_fn):
+            with open(qid2cols_fn, 'rb') as f:
+                qid2cols = pickle.load(f)
+        
 
         for tupl in tuples:
             query_classes, query_class_frequencies = tupl
@@ -395,10 +415,14 @@ class WorkloadGenerator(object):
 
                 query = Query(query_class, query_text, frequency=frequency)
 
-                self._store_indexable_columns(query)
+                self._store_indexable_columns(query, qid2cols)
+                # print(f"{len(query.columns)}: ")
+                # print(query.columns)
                 assert len(query.columns) > 0, f"Query columns should have length > 0: {query.text}"
 
                 queries.append(query)
+            # with open(qid2cols_fn, 'wb') as f:
+            #     pickle.dump(qid2cols, f)
 
             assert isinstance(queries, list), f"Queries is not of type list but of {type(queries)}"
             previously_unseen_queries = (

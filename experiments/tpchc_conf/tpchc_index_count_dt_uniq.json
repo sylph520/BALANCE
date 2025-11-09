@@ -38,9 +38,8 @@
     "args": {
       "cliprange": 0.3,
       "learning_rate": 5e-05,
-      "n_steps": 512,
-      "nminibatches": 4,
-      "noptepochs": 30
+      "n_steps": 256,
+	  "ent_coef": 0.1
     }
   },
   "workload": {
