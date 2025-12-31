@@ -12,7 +12,7 @@ from balance.chunk_segmenter import segment_workloads, workload_fits_chunk
 from index_selection_evaluation.selection.workload import Workload, Query
 from balance.schema import Schema
 from balance.workload_generator import WorkloadGenerator
-from balance.query_hasher import query_to_hash
+from balance.query_hasher import qid2cols
 from balance.experiment import setup_exp_folder
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -20,13 +20,20 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 def convert_dict_to_workload(workload_dict, workload_generator, unify_similar_ops=False):
     queries = []
     for _, (text, freq) in enumerate(workload_dict.items()):
-        _, tpl = query_to_hash(text, unify_similar_ops=unify_similar_ops, dbname=workload_generator.database_name)
+        _, tpl = qid2cols(text, unify_similar_ops=unify_similar_ops, dbname=workload_generator.database_name)
         tid = workload_generator.tpl2tid[tpl]
         query = Query(tid, text, freq)
         query.columns = []
         workload_generator._store_indexable_columns(query)
         queries.append(query)
-    return Workload(queries)
+    reorder_flag = False
+    if reorder_flag:
+        order_idx = workload_generator.temp_genone[0]
+        queries_reordered = [queries[order_idx[i]-1] for i in range(len(queries))]
+        workload = Workload(queries_reordered)
+    else:
+        workload = Workload(queries)
+    return workload
 
 
 
@@ -143,7 +150,7 @@ def main():
             tpl_stream = []
             for w in flat_workload_stream_dicts:
                 for qstr  in w:
-                    q_tpl_hash, tpl = query_to_hash(qstr, unify_similar_ops=args.uniComp, dbname=dbname)
+                    q_tpl_hash, tpl = qid2cols(qstr, unify_similar_ops=args.uniComp, dbname=dbname)
                     tpl_stream.append(tpl)
                     if q_tpl_hash not in hash2tid:
                         tpl2tid[tpl] = i
@@ -192,7 +199,11 @@ def main():
 
     ws_debug = []
 
-    weight_path_list = [os.path.join(args.weight_list_path, f"weights{i}.pkl") for i in range(1, args.wk_size + 1)]
+    if args.weight_list_path:
+        weight_path_list = [os.path.join(args.weight_list_path, f"weights{i}.pkl") for i in range(1, args.wk_size + 1)]
+    else:
+        weight_path_list = []
+        
 
     w_ptr = 0
     exp_folder = ''
@@ -211,11 +222,14 @@ def main():
             else:
                 chunk_config_path = base_config_path
                 uni_freq_flag = True
-
+            if len(weight_path_list) > 0:
+                weight_path_cur = weight_path_list[w_ptr]
+            else:
+                weight_path_cur = ''
             exp_folder = run_single_experiment(chunk_config_path, test_only=args.test_only, ts=config['timesteps'],
                         uni_freq=uni_freq_flag, fix_index_count=config['fix_index_count'], newf=args.newf,
                         input_workload=w, random_seed=args.random_seed,
-                        weight_path=weight_path_list[w_ptr], shuffle=args.shuffle,
+                        weight_path=weight_path_cur, shuffle=args.shuffle,
                         tb_log_path=args.tb_log)
 
             chunk_config_path = f"{exp_folder}/{benchmark}_temp_config_chunk_{chunk_ptr}.json"
@@ -251,6 +265,7 @@ def main():
                         )
             print(f"test the model for new workload fits in the chunk {chunk_ptr}")
         w_ptr += 1
+        break
 
 
 
