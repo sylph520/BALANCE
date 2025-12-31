@@ -1,0 +1,1 @@
+bash run_batch.sh --bm tpcds12 --config experiments/tpcdsc_conf/tpcdsc_index_count_tune.json --uni_freq  --model_path tensor_log/tblog_ID_Test_Experiment_1_Index_Count_TPCDSC_ts100000_dmxsz50_PPO2-cliprange0p3-learning_rate5em05-n_steps512-nminibatches4-noptepochs30-gamma0p5_varyFreq_idxmax5OFFprecedentMasking_4/moving_average_model.zip > tpcds_shifting12.log 2>&1

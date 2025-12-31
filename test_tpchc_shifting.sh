@@ -1,0 +1,1 @@
+python main.py --config experiments/tpchc_conf/tpchc_index_count.json --test_only --uni_freq --test_model_freq uniFreq --load_model tensor_log/tblog_ID_Test_Experiment_1_Index_Count_TPCHC_ts2000000_dmxsz50_PPO2-learning_rate8em05-n_steps256-gamma0p5_varyFreq_idxmax3OFFprecedentMasking_1/final_model.zip --input_workload_path query_files/TPCHC/tpchc_20.sql
