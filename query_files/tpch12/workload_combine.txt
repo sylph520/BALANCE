@@ -1,0 +1,240 @@
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05
+SELECT nation.n_name FROM region,nation WHERE nation.n_regionkey = region.r_regionkey AND n_nationkey > 6 AND r_comment > 'lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to ';
+SELECT partsupp.ps_partkey FROM partsupp,supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND s_nationkey > 12 AND s_suppkey < 4677;
+SELECT nation.n_regionkey FROM region,nation WHERE nation.n_regionkey = region.r_regionkey AND n_comment < 'ss excuses cajole slyly across the packages. deposits print aroun' AND n_name < 'INDIA                    ';
+SELECT lineitem.l_linenumber FROM partsupp,lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND l_orderkey > 1588321 AND ps_partkey > 30326;
+SELECT customer.c_acctbal FROM customer,orders WHERE customer.c_custkey = orders.o_custkey AND o_clerk > 'Clerk#000000571' AND c_address < 'j9Up7bAPIweDabxjQ6k';
+SELECT customer.c_acctbal FROM customer,orders WHERE customer.c_custkey = orders.o_custkey AND c_address > 'Re LJfwOVjIDkGSnLcTh66HtYa9NB,,s0VxFB' AND o_comment > 'its sleep carefully reg';
+SELECT supplier.s_name FROM lineitem,supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND s_phone > '14-380-268-2685' AND l_shipmode < 'AIR       ';
+SELECT partsupp.ps_suppkey FROM partsupp,lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND l_orderkey < 3875969 AND l_extendedprice > 61411.50;
+SELECT orders.o_custkey FROM orders,lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND l_extendedprice > 43724.24 AND l_suppkey > 9746;
+SELECT part.p_retailprice FROM part,partsupp WHERE part.p_partkey = partsupp.ps_partkey AND p_name > 'lemon lace pink tan drab' AND p_brand > 'Brand#34  ';
+SELECT lineitem.l_partkey FROM partsupp,lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND ps_partkey < 10585 AND l_linestatus < 'F';
+SELECT lineitem.l_quantity FROM orders,lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND l_returnflag < 'R' AND l_extendedprice < 26085.45;
+SELECT lineitem.l_shipmode FROM partsupp,lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND l_quantity < 12.00 AND l_partkey > 178982;
+SELECT partsupp.ps_suppkey FROM partsupp,supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND ps_partkey < 166844 AND ps_supplycost < 49.36;
+SELECT lineitem.l_linestatus FROM part,lineitem WHERE lineitem.l_partkey = part.p_partkey AND l_comment > 'sits about the sl' AND l_shipmode < 'TRUCK     ';
+SELECT lineitem.l_quantity FROM partsupp,lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND l_linenumber > 4 AND l_shipmode < 'REG AIR   ';
+SELECT orders.o_totalprice FROM customer,orders WHERE customer.c_custkey = orders.o_custkey AND c_nationkey < 7 AND o_orderpriority > '1-URGENT       ';
+SELECT lineitem.l_linestatus FROM lineitem,supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND l_commitdate < '1997-12-06' AND l_extendedprice > 57586.72;
+SELECT partsupp.ps_availqty FROM part,partsupp WHERE part.p_partkey = partsupp.ps_partkey AND ps_comment > 'cajole furiously quiet dolphins. carefully ironic courts run furiously. unusual deposits above the express, ironic platelets cajole after the final, even ideas. quickly ' AND ps_supplycost < 286.58;
+SELECT lineitem.l_commitdate FROM partsupp,lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND l_suppkey < 7826 AND l_tax > 0.05;
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+select nation.n_name from region, nation where nation.n_regionkey = region.r_regionkey and nation.n_nationkey < 2 and region.r_comment = 'ly final courts cajole furiously final excuse';
+select partsupp.ps_partkey from partsupp, supplier where supplier.s_suppkey = partsupp.ps_suppkey and supplier.s_nationkey = 20 and supplier.s_suppkey = 2682;
+select nation.n_regionkey from region, nation where nation.n_regionkey = region.r_regionkey and nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' and nation.n_name = 'EGYPT                    ';
+select lineitem.l_linenumber from partsupp, lineitem where lineitem.l_partkey = partsupp.ps_partkey and lineitem.l_orderkey < 1296422 and partsupp.ps_partkey = 35538;
+select customer.c_acctbal from customer, orders where customer.c_custkey = orders.o_custkey and orders.o_clerk = 'Clerk#000000107' and customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx';
+select customer.c_acctbal from customer, orders where customer.c_custkey = orders.o_custkey and customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' and orders.o_comment = 'egular requests integrate quickly ';
+select supplier.s_name from lineitem, supplier where lineitem.l_suppkey = supplier.s_suppkey and supplier.s_phone = '26-265-429-8153' and lineitem.l_shipmode = 'MAIL      ';
+select partsupp.ps_suppkey from partsupp, lineitem where lineitem.l_partkey = partsupp.ps_partkey and lineitem.l_orderkey > 868036 and lineitem.l_extendedprice < 42570.15;
+select orders.o_custkey from orders, lineitem where lineitem.l_orderkey = orders.o_orderkey and lineitem.l_extendedprice = 19092.59 and lineitem.l_suppkey < 7808;
+select part.p_retailprice from part, partsupp where part.p_partkey = partsupp.ps_partkey and part.p_name = 'sky burlywood lawn almond tan' and part.p_brand = 'Brand#25  ';
+select lineitem.l_partkey from partsupp, lineitem where lineitem.l_partkey = partsupp.ps_partkey and partsupp.ps_partkey = 105677 and lineitem.l_linestatus = 'O';
+select lineitem.l_quantity from orders, lineitem where lineitem.l_orderkey = orders.o_orderkey and lineitem.l_returnflag = 'R' and lineitem.l_extendedprice > 45771.32;
+select lineitem.l_shipmode from partsupp, lineitem where lineitem.l_suppkey = partsupp.ps_suppkey and lineitem.l_quantity > 32.00 and lineitem.l_partkey < 132057;
+select partsupp.ps_suppkey from partsupp, supplier where supplier.s_suppkey = partsupp.ps_suppkey and partsupp.ps_partkey > 36832 and partsupp.ps_supplycost > 640.38;
+select lineitem.l_linestatus from part, lineitem where lineitem.l_partkey = part.p_partkey and lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' and lineitem.l_shipmode = 'TRUCK     ';
+select lineitem.l_quantity from partsupp, lineitem where lineitem.l_suppkey = partsupp.ps_suppkey and lineitem.l_linenumber = 3 and lineitem.l_shipmode = 'MAIL      ';
+select orders.o_totalprice from customer, orders where customer.c_custkey = orders.o_custkey and customer.c_nationkey > 23 and orders.o_orderpriority = '1-URGENT       ';
+select lineitem.l_linestatus from lineitem, supplier where lineitem.l_suppkey = supplier.s_suppkey and lineitem.l_commitdate = date'1998-06-16' and lineitem.l_extendedprice < 40722.24;
+select partsupp.ps_availqty from part, partsupp where part.p_partkey = partsupp.ps_partkey and partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' and partsupp.ps_supplycost > 307.11;
+select lineitem.l_commitdate from partsupp, lineitem where lineitem.l_partkey = partsupp.ps_partkey and lineitem.l_suppkey > 4878 and lineitem.l_tax = 0.05;
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05;
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05;
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05;
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05;
+SELECT nation.n_name FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_nationkey < 2 AND region.r_comment = 'ly final courts cajole furiously final excuse'
+SELECT partsupp.ps_partkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND supplier.s_nationkey = 20 AND supplier.s_suppkey = 2682
+SELECT nation.n_regionkey FROM region, nation WHERE nation.n_regionkey = region.r_regionkey AND nation.n_comment = 'c dependencies. furiously express notornis sleep slyly regular accounts. ideas sleep. depos' AND nation.n_name = 'EGYPT                    '
+SELECT lineitem.l_linenumber FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey < 1296422 AND partsupp.ps_partkey = 35538
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND orders.o_clerk = 'Clerk#000000107' AND customer.c_address = 'cR5QLdFoi6e2K96SOIuBSTagcn9orFt7,xWx'
+SELECT customer.c_acctbal FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_address = 'eg5fr71AHlvZ4II4mNQoO' AND orders.o_comment = 'egular requests integrate quickly '
+SELECT supplier.s_name FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND supplier.s_phone = '26-265-429-8153' AND lineitem.l_shipmode = 'MAIL      '
+SELECT partsupp.ps_suppkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_orderkey > 868036 AND lineitem.l_extendedprice < 42570.15
+SELECT orders.o_custkey FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_extendedprice = 19092.59 AND lineitem.l_suppkey < 7808
+SELECT part.p_retailprice FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND part.p_name = 'sky burlywood lawn almond tan' AND part.p_brand = 'Brand#25  '
+SELECT lineitem.l_partkey FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND partsupp.ps_partkey = 105677 AND lineitem.l_linestatus = 'O'
+SELECT lineitem.l_quantity FROM orders, lineitem WHERE lineitem.l_orderkey = orders.o_orderkey AND lineitem.l_returnflag = 'R' AND lineitem.l_extendedprice > 45771.32
+SELECT lineitem.l_shipmode FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_quantity > 32.00 AND lineitem.l_partkey < 132057
+SELECT partsupp.ps_suppkey FROM partsupp, supplier WHERE supplier.s_suppkey = partsupp.ps_suppkey AND partsupp.ps_partkey > 36832 AND partsupp.ps_supplycost > 640.38
+SELECT lineitem.l_linestatus FROM part, lineitem WHERE lineitem.l_partkey = part.p_partkey AND lineitem.l_comment = 'ial, regular asymptotes wake quickly regula' AND lineitem.l_shipmode = 'TRUCK     '
+SELECT lineitem.l_quantity FROM partsupp, lineitem WHERE lineitem.l_suppkey = partsupp.ps_suppkey AND lineitem.l_linenumber = 3 AND lineitem.l_shipmode = 'MAIL      '
+SELECT orders.o_totalprice FROM customer, orders WHERE customer.c_custkey = orders.o_custkey AND customer.c_nationkey > 23 AND orders.o_orderpriority = '1-URGENT       '
+SELECT lineitem.l_linestatus FROM lineitem, supplier WHERE lineitem.l_suppkey = supplier.s_suppkey AND lineitem.l_commitdate = CAST('1998-06-16' AS date) AND lineitem.l_extendedprice < 40722.24
+SELECT partsupp.ps_availqty FROM part, partsupp WHERE part.p_partkey = partsupp.ps_partkey AND partsupp.ps_comment = 'en somas are around the furiously final deposits. quickly ironic instructions' AND partsupp.ps_supplycost > 307.11
+SELECT lineitem.l_commitdate FROM partsupp, lineitem WHERE lineitem.l_partkey = partsupp.ps_partkey AND lineitem.l_suppkey > 4878 AND lineitem.l_tax = 0.05

@@ -1,0 +1,20 @@
+SELECT cs_warehouse_sk FROM promotion, catalog_sales WHERE cs_promo_sk = p_promo_sk AND promotion.p_channel_dmail = 'N' AND catalog_sales.cs_quantity > 55
+SELECT sr_return_time_sk FROM store_returns, store_sales WHERE ss_item_sk = sr_item_sk AND store_sales.ss_sales_price > 7.05 AND store_sales.ss_ext_discount_amt < 0.00
+SELECT ss_sales_price FROM store_returns, store_sales WHERE sr_item_sk = ss_item_sk AND store_returns.sr_return_ship_cost = 2914.00 AND store_sales.ss_list_price > 89.10
+SELECT cs_coupon_amt FROM item, catalog_sales WHERE i_item_sk = cs_item_sk AND catalog_sales.cs_ship_hdemo_sk = 2881 AND catalog_sales.cs_ext_sales_price = 112.00
+SELECT ws_order_number FROM web_sales, date_dim WHERE d_date_sk = ws_sold_date_sk AND web_sales.ws_list_price < 94.77 AND web_sales.ws_wholesale_cost > 9.52
+SELECT ss_addr_sk FROM item, store_sales WHERE i_item_sk = ss_item_sk AND store_sales.ss_sales_price > 3.19 AND item.i_container = 'Unknown   '
+SELECT ws_ext_discount_amt FROM web_sales, date_dim WHERE d_date_sk = ws_sold_date_sk AND web_sales.ws_ship_cdemo_sk = 1101255 AND web_sales.ws_web_site_sk > 13
+SELECT cr_warehouse_sk FROM catalog_returns, catalog_sales WHERE cr_order_number = cs_order_number AND catalog_sales.cs_ship_hdemo_sk < 5324 AND catalog_sales.cs_list_price = 37.36
+SELECT ws_ext_list_price FROM web_sales, web_returns WHERE wr_order_number = ws_order_number AND web_sales.ws_ext_sales_price > 5017.35 AND web_sales.ws_warehouse_sk > 5
+SELECT cs_ext_list_price FROM catalog_sales, inventory WHERE cs_item_sk = inv_item_sk AND catalog_sales.cs_coupon_amt = 212.97 AND catalog_sales.cs_bill_customer_sk = 90140
+SELECT cs_ship_date_sk FROM promotion, catalog_sales WHERE cs_promo_sk = p_promo_sk AND promotion.p_item_sk < 5038 AND catalog_sales.cs_item_sk = 17637
+SELECT inv_item_sk FROM warehouse, inventory WHERE w_warehouse_sk = inv_warehouse_sk AND inventory.inv_item_sk < 13106 AND warehouse.w_street_name = 'Wilson Elm'
+SELECT cs_ext_discount_amt FROM catalog_sales, date_dim WHERE d_date_sk = cs_sold_date_sk AND date_dim.d_day_name = 'Tuesday  ' AND catalog_sales.cs_net_paid_inc_ship > 1156.44
+SELECT d_current_year FROM catalog_sales, date_dim WHERE d_date_sk = cs_sold_date_sk AND catalog_sales.cs_ship_mode_sk = 15 AND catalog_sales.cs_ship_addr_sk > 4672
+SELECT cs_order_number FROM catalog_sales, date_dim WHERE d_date_sk = cs_sold_date_sk AND date_dim.d_current_day = 'N' AND date_dim.d_fy_week_seq < 10082
+SELECT ws_ext_ship_cost FROM web_sales, store_sales WHERE ws_item_sk = ss_item_sk AND store_sales.ss_ticket_number = 119333 AND web_sales.ws_ext_tax > 0.00
+SELECT sr_return_quantity FROM store_returns, store_sales WHERE sr_ticket_number = ss_ticket_number AND store_returns.sr_returned_date_sk > 2451326 AND store_returns.sr_reason_sk < 32
+SELECT ss_net_profit FROM store_returns, store_sales WHERE ss_ticket_number = sr_ticket_number AND store_sales.ss_promo_sk < 224 AND store_returns.sr_fee > 93.35
+SELECT ws_ext_ship_cost FROM web_sales, web_returns WHERE wr_order_number = ws_order_number AND web_sales.ws_bill_addr_sk > 45614 AND web_returns.wr_returning_addr_sk > 15553
+SELECT ss_sales_price FROM web_sales, store_sales WHERE ws_item_sk = ss_item_sk AND store_sales.ss_ext_sales_price < 470.64 AND web_sales.ws_ext_sales_price = 4853.80

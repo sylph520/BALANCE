@@ -1,0 +1,11 @@
+selchange
+reweight
+shuffle
+reweight
+shuffle
+selchange
+reweight
+selchange
+reweight
+selchange
+shuffle
